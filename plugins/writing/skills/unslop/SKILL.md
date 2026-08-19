@@ -1,6 +1,6 @@
 ---
 name: unslop
-description: Cut AI tells from any writing. Must always apply.
+description: 'Removes AI writing tells from prose and rewrites it in plain, direct language. Use when writing or editing documentation, README and CHANGELOG entries, PR descriptions, commit message bodies, code comments, or any prose that reads as machine-generated.'
 ---
 
 # Unslop
@@ -9,21 +9,58 @@ Edit text to remove AI patterns and add human voice.
 
 ## Process
 
-1. Scan for the patterns below.
-2. Rewrite. Preserve meaning, match intended tone.
-3. Add soul (see next section).
-4. Self-audit: "What makes this obviously AI generated?" Fix remaining tells.
+1. Identify the voice level for what is being edited (see next section).
+2. Scan for the patterns below. They apply at every voice level.
+3. Rewrite. Preserve meaning, match intended tone.
+4. Be specific. Not "this is concerning" but "there's something unsettling
+   about agents churning away at 3am". Vague writing reads as generated at
+   every voice level, including reference.
+5. Apply the voice level.
+6. Self-audit: "What makes this obviously AI generated?" Fix remaining tells.
 
-## Adding soul
+## Voice levels
 
-Removing patterns is half the job. Sterile, voiceless writing is just as obvious.
+Cutting AI patterns applies everywhere. How much personality to add does not.
+Sterile writing is a tell in a PR description and correct in an API reference.
 
-- **Have opinions.** React to facts instead of neutrally listing pros and cons.
-- **Vary rhythm.** Short sentences. Then longer ones that take their time. Mix it up.
-- **Acknowledge complexity.** "Impressive but also kind of unsettling" beats "impressive."
-- **Use "I" when it fits.** First person isn't unprofessional.
-- **Let some mess in.** Perfect structure looks machine-made.
-- **Be specific.** Not "this is concerning" but "there's something unsettling about agents churning away at 3am."
+Pick the level from the surface being edited.
+
+| Level | Surfaces |
+| --- | --- |
+| Reference | YARD doc comments, API reference, CHANGELOG entries, SKILL.md and other agent instruction files, config file comments, commit subject lines |
+| Explanatory | README, CONTRIBUTING, UPGRADING, design and architecture docs, code comments explaining why, issue bodies, commit message bodies |
+| Conversational | PR descriptions, PR review comments, issue and PR discussion, replies to contributors, release announcements, blog posts |
+
+When one file mixes levels, use the level of the passage, not the file. A
+worked example inside a README stays Explanatory. A rationale note inside a
+YARD `@note` tag stays Reference.
+
+### Reference
+
+No added voice. State the fact and stop.
+
+- Third person. Never "I". Use "you" only when instructing the caller.
+- Uniform sentence rhythm. Predictable structure is a feature here.
+- No hedging, no opinions, no asides. If behavior is conditional, name the
+  condition instead of softening the sentence.
+
+### Explanatory
+
+Restrained voice. The reader needs to understand a decision, not meet the author.
+
+- Have opinions about tradeoffs. "Slower, but it survives a locale change"
+  beats listing both options neutrally.
+- Vary rhythm. Short sentences. Then longer ones that take their time.
+- Acknowledge complexity. Say when something is genuinely awkward, and why.
+- Still third person. No "I", no conversational asides, no deliberate mess.
+
+### Conversational
+
+Full voice. The reader is a person who may reply.
+
+- Everything in Explanatory, plus the following.
+- Use "I" when it fits. First person is not unprofessional.
+- Let some mess in. Perfect structure looks machine made.
 
 ## Patterns to detect and fix
 
