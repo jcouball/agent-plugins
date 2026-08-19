@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+#
+# Release a plugin from this marketplace.
+#
+# Bumps the plugin version, commits it, refreshes the marketplace, upgrades the
+# installed plugin, and verifies that what is installed matches this commit.
+#
+# Usage:
+#   bin/release <plugin> <version> [--dry-run]
+#
+# Example:
+#   bin/release writing 1.2.0
+#
+set -euo pipefail
+
+die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+note() { printf '  %s\n' "$*"; }
+step() { printf '\n%s\n' "$*"; }
+
+dry_run=false
+args=()
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) dry_run=true ;;
+    -*) die "unknown option: $arg" ;;
+    *) args+=("$arg") ;;
+  esac
+done
+
+[ "${#args[@]}" -eq 2 ] || die "usage: bin/release <plugin> <version> [--dry-run]"
+plugin="${args[0]}"
+version="${args[1]}"
+
+repo_root=$(git rev-parse --show-toplevel 2>/dev/null) || die "not inside a git repository"
+cd "$repo_root"
+
+manifest="plugins/$plugin/.claude-plugin/plugin.json"
+marketplace_manifest=".claude-plugin/marketplace.json"
+
+[ -f "$marketplace_manifest" ] || die "no marketplace manifest at $marketplace_manifest"
+[ -f "$manifest" ] || die "no plugin named '$plugin'. Expected a manifest at $manifest"
+
+printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' \
+  || die "version must be MAJOR.MINOR.PATCH, got: $version"
+
+if [ -n "$(git status --porcelain)" ]; then
+  die "working tree is dirty. Commit content changes first, then release."
+fi
+
+step "Validating manifests"
+python3 - "$plugin" "$version" <<'PY'
+import json, os, sys
+
+plugin, version = sys.argv[1], sys.argv[2]
+market = json.load(open(".claude-plugin/marketplace.json"))
+manifest_path = f"plugins/{plugin}/.claude-plugin/plugin.json"
+manifest = json.load(open(manifest_path))
+
+errors = []
+
+entry = next((p for p in market.get("plugins", []) if p.get("name") == manifest["name"]), None)
+if entry is None:
+    errors.append(f"{manifest['name']} is not listed in the marketplace manifest")
+else:
+    source = entry.get("source")
+    if isinstance(source, str) and not os.path.isdir(source):
+        errors.append(f"marketplace source path does not exist: {source}")
+
+if manifest["version"] == version:
+    errors.append(f"version is already {version}. Nothing to release.")
+
+for rel in manifest.get("skills", []):
+    skill = os.path.join(f"plugins/{plugin}", rel, "SKILL.md")
+    if not os.path.isfile(skill):
+        errors.append(f"declared skill has no SKILL.md: {skill}")
+
+for root, _dirs, files in os.walk(f"plugins/{plugin}/skills"):
+    if "SKILL.md" in files:
+        rel = "./" + os.path.relpath(root, f"plugins/{plugin}")
+        if manifest.get("skills") and rel not in manifest["skills"]:
+            errors.append(f"skill on disk but not declared in the manifest: {rel}")
+
+if errors:
+    for e in errors:
+        print(f"  {e}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"  {manifest['name']} {manifest['version']} -> {version}")
+PY
+
+marketplace_name=$(python3 -c "import json;print(json.load(open('.claude-plugin/marketplace.json'))['name'])")
+plugin_name=$(python3 -c "import json,sys;print(json.load(open(sys.argv[1]))['name'])" "$manifest")
+
+step "Bumping $manifest"
+python3 - "$manifest" "$version" <<'PY'
+import json, sys
+path, version = sys.argv[1], sys.argv[2]
+data = json.load(open(path))
+data["version"] = version
+with open(path, "w") as f:
+    json.dump(data, f, indent=2)
+    f.write("\n")
+PY
+note "version set to $version"
+
+if [ "$dry_run" = true ]; then
+  step "Dry run: reverting the bump and stopping before commit"
+  git checkout -- "$manifest"
+  note "no commit, no install, nothing changed"
+  exit 0
+fi
+
+step "Committing"
+git add "$manifest"
+git commit -q -m "chore($plugin): release v$version"
+sha=$(git rev-parse HEAD)
+note "$(git log --oneline -1)"
+
+step "Refreshing the marketplace"
+claude plugin marketplace update "$marketplace_name"
+
+step "Upgrading the installed plugin"
+# 'install' silently no-ops when the plugin is already installed, so update first.
+# 'update' needs the marketplace-qualified name or it reports the plugin as not found.
+if ! claude plugin update "$plugin_name@$marketplace_name"; then
+  note "update failed, trying a fresh install"
+  claude plugin install "$plugin_name@$marketplace_name"
+fi
+
+step "Verifying what is actually installed"
+# 'claude plugin details' reads the marketplace source, not the installed copy,
+# so it cannot confirm an upgrade. Read the install record instead.
+python3 - "$plugin_name@$marketplace_name" "$version" "$sha" <<'PY'
+import json, os, sys
+
+key, version, sha = sys.argv[1], sys.argv[2], sys.argv[3]
+record = json.load(open(os.path.expanduser("~/.claude/plugins/installed_plugins.json")))
+installs = record.get("plugins", {}).get(key)
+if not installs:
+    sys.exit(f"  {key} is not installed")
+
+install = installs[0]
+problems = []
+if install.get("version") != version:
+    problems.append(f"installed version is {install.get('version')}, expected {version}")
+if install.get("gitCommitSha") != sha:
+    problems.append(f"installed sha is {install.get('gitCommitSha', '')[:10]}, expected {sha[:10]}")
+
+if problems:
+    for p in problems:
+        print(f"  {p}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"  {key} {version} at {sha[:10]}")
+print(f"  {install['installPath']}")
+PY
+
+step "Done. Restart Claude Code to load the new version."
