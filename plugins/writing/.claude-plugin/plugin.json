@@ -1,0 +1,13 @@
+{
+  "name": "jcouball-writing",
+  "version": "1.0.0",
+  "description": "Writing and explanation tools. Strips AI tells from prose while keeping reference docs dry, and explains technical subjects in plain language without dropping the real terms.",
+  "author": {
+    "name": "James Couball"
+  },
+  "homepage": "https://github.com/jcouball/agent-plugins",
+  "repository": "https://github.com/jcouball/agent-plugins",
+  "license": "MIT",
+  "keywords": ["writing", "documentation", "prose", "editing", "explanation"],
+  "skills": ["./skills/unslop"]
+}

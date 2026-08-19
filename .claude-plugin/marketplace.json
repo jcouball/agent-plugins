@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "jcouball",
+  "description": "James Couball's agent plugins: cross-repo skills and commands for writing, explaining, and maintaining Ruby open source projects.",
+  "owner": {
+    "name": "James Couball"
+  },
+  "plugins": [
+    {
+      "name": "jcouball-writing",
+      "description": "Writing and explanation tools. Strips AI tells from prose while keeping reference docs dry, and explains technical subjects in plain language without dropping the real terms.",
+      "author": {
+        "name": "James Couball"
+      },
+      "category": "development",
+      "source": "./plugins/writing",
+      "homepage": "https://github.com/jcouball/agent-plugins"
+    }
+  ]
+}
