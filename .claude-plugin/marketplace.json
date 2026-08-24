@@ -15,6 +15,16 @@
       "category": "development",
       "source": "./plugins/writing",
       "homepage": "https://github.com/jcouball/agent-plugins"
+    },
+    {
+      "name": "jcouball-github",
+      "description": "GitHub pull request workflow tools. Resolves PR review feedback and suppressed Copilot comments, folds fixes into the commits that introduced them, and requests fresh Copilot reviews.",
+      "author": {
+        "name": "James Couball"
+      },
+      "category": "development",
+      "source": "./plugins/github",
+      "homepage": "https://github.com/jcouball/agent-plugins"
     }
   ]
 }
