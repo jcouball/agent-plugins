@@ -1,6 +1,6 @@
 ---
 name: resolve-feedback
-description: 'Resolves unresolved pull request review threads and suppressed (low-confidence) Copilot review comments on the current branch, folds each fix into the existing commit that last touched the same file, force-pushes with lease, and requests a fresh Copilot review. Use when addressing PR feedback, resolving review comments or threads, handling comments suppressed due to low confidence, amending fixes into prior commits, or asking Copilot to re-review after changes.'
+description: 'Resolves unresolved pull request review threads and suppressed (low-confidence) Copilot review comments on the current branch, folds each fix into the existing commit that last touched the same file, force-pushes with lease, and requests a fresh Copilot review. Use when addressing PR feedback, resolving review comments or threads, handling comments suppressed due to low confidence, amending fixes into prior commits, or asking Copilot to re-review after changes. If the current project has its own resolve-feedback skill, use the project''s version instead of this one.'
 ---
 
 # Resolve Feedback
@@ -14,7 +14,6 @@ review.
 
 - [Contents](#contents)
 - [How to use this skill](#how-to-use-this-skill)
-- [Related skills](#related-skills)
 - [Prerequisites](#prerequisites)
 - [Terms](#terms)
 - [Safety and stop points](#safety-and-stop-points)
@@ -32,25 +31,17 @@ review.
 
 ## How to use this skill
 
-Attach this file to your Copilot Chat context and invoke it when a PR has review
-feedback to address on the current branch. Work top to bottom. Stop and ask the
-user whenever a thread or suppressed comment needs a clarification or decision
-(Step 4) and before the history-rewriting force-push (Step 7).
-
-## Related skills
-
-- [Pull Request Review](../pull-request-review/SKILL.md) — the review workflow
-  that produces the threads this skill resolves
-- [PR Readiness Review](../pr-readiness-review/SKILL.md) — pre-PR quality gate to
-  run before pushing follow-up changes
-- [Development Workflow](../development-workflow/SKILL.md) — TDD process and
-  branch rules that govern the fixes made here
+Invoke this skill when a PR has review feedback to address on the current
+branch. Work top to bottom. Stop and ask the user whenever a thread or
+suppressed comment needs a clarification or decision (Step 4) and before the
+history-rewriting force-push (Step 7).
 
 ## Prerequisites
 
 - The `gh` CLI is installed and authenticated (`gh auth status`).
 - The `jq` CLI is installed (Step 3 pipes `gh api` output through it).
-- The current branch has an open PR and is a topic branch (not `main` or `4.x`).
+- The current branch has an open PR and is a topic branch (not the default
+  branch or a release/maintenance branch).
 - The working tree has no unrelated uncommitted changes before starting.
 
 ## Terms
@@ -72,8 +63,8 @@ user whenever a thread or suppressed comment needs a clarification or decision
 
 These rules are mandatory:
 
-- Never rewrite history on `main` or `4.x`. Confirm the branch first with
-  `git branch --show-current`.
+- Never rewrite history on the default branch or a release/maintenance branch.
+  Confirm the branch first with `git branch --show-current`.
 - Stop and ask the user whenever a thread or suppressed comment requests a
   clarification or decision (Step 4). Do not guess on ambiguous feedback.
 - Force-push only with `--force-with-lease`, and only after the user confirms
@@ -107,20 +98,22 @@ associated with the branch, stop and tell the user.
 
 ## Step 2: Fetch unresolved review threads
 
-List the first 100 review threads and keep the ones where `isResolved` is
-`false`. For unusually active PRs with more than 100 review threads, paginate
-before assuming no unresolved threads remain.
+List every review thread and keep the ones where `isResolved` is `false`.
+`--paginate` walks the pages, so a PR with more than 100 review threads needs
+no second command. gh supplies the `$endCursor` variable on each request, and
+the query has to declare it and expose `pageInfo` for that to work.
 
 ```bash
 OWNER=$(gh repo view --json owner --jq '.owner.login')
 REPO=$(gh repo view --json name --jq '.name')
 PR_NUMBER=$(gh pr view --json number --jq '.number')
 
-gh api graphql -f query='
-  query($owner:String!, $repo:String!, $pr:Int!) {
+gh api graphql --paginate -f query='
+  query($owner:String!, $repo:String!, $pr:Int!, $endCursor:String) {
     repository(owner:$owner, name:$repo) {
       pullRequest(number:$pr) {
-        reviewThreads(first:100) {
+        reviewThreads(first:100, after:$endCursor) {
+          pageInfo { hasNextPage endCursor }
           nodes {
             id
             isResolved
@@ -195,14 +188,10 @@ Do not proceed to Step 5 for an item until its resolution is clear.
 ## Step 5: Implement the changes
 
 Apply the agreed changes in the workspace. Keep edits for each item minimal and
-scoped to what the feedback asks. If the project has tests or linters, run the
-relevant checks before folding changes into commits:
-
-```bash
-bundle exec rake default
-```
-
-Fix any failures before continuing.
+scoped to what the feedback asks. Before folding changes into commits, run the
+project's local CI equivalent — whatever task the project uses to run its tests
+and linters locally (a default rake task, `make check`, an npm `test` script,
+or similar). Fix any failures before continuing.
 
 ## Step 6: Fold each change into the matching commit
 
