@@ -1,0 +1,36 @@
+---
+name: Release
+
+# Maintains a release pull request for each plugin. Merging one bumps the
+# version in the plugin manifest, updates the plugin CHANGELOG, tags the
+# commit, and cuts a GitHub release.
+#
+# There is nothing to publish. The marketplace serves the default branch
+# directly, so a release here is a tagged commit and nothing more.
+
+on:
+  push:
+    branches: [main]
+
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Create release pull requests and releases
+        uses: googleapis/release-please-action@v5
+        with:
+          # A pull request opened by GITHUB_TOKEN does not start other
+          # workflows, so release pull requests would sit without CI results.
+          # AUTO_RELEASE_TOKEN is a personal access token with contents and
+          # pull-requests write. The fallback keeps this workflow working
+          # before that secret exists.
+          token: ${{ secrets.AUTO_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: .release-please-config.json
+          manifest-file: .release-please-manifest.json
