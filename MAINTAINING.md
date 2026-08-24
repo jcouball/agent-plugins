@@ -77,18 +77,28 @@ pulls from GitHub, only merged work can be installed.
 Restart Claude Code afterward. A running session keeps the version it started
 with.
 
-### Before the first release
+### How release-please finds the starting point
 
-release-please finds the previous release from git tags. With no tags, it
-treats the whole history as unreleased and proposes versions built from
-commits that already shipped. Tag the current versions once, and it will only
-consider what comes after:
+release-please looks for a tag named `<component>-v<version>`, taking the
+version from `.release-please-manifest.json`, and considers only the commits
+that touched the plugin's directory since that tag. With no tag it reads the
+whole history, which on a repository that predates release-please means
+proposing versions built from commits that already shipped.
+
+Both plugins were tagged once to give it a floor. This is done and does not
+need repeating:
 
 ```bash
-git tag writing-v1.1.0
-git tag github-v1.0.0
+git tag writing-v1.1.0 e5d49b9
+git tag github-v1.0.0 e5d49b9
 git push --tags
 ```
+
+A new plugin needs a tag only if its seeded version should ship as it stands.
+Without one, the commits that created the plugin all count toward its next
+release, so a `feat` among them bumps the seeded version before it has shipped
+at all. Tag the creating commit to release that version unchanged, or leave it
+untagged and let the first release pull request bump past it.
 
 ## Running the checks
 
@@ -135,7 +145,10 @@ an error.
    `"source": "./plugins/<name>"`.
 3. Add the plugin to `.release-please-config.json` and seed its starting
    version in `.release-please-manifest.json`. The manifest check fails while
-   either is missing.
+   either is missing. Whether that seeded version ships as it stands depends on
+   whether you tag it, which
+   [How release-please finds the starting point](#how-release-please-finds-the-starting-point)
+   explains.
 4. Install it: `claude plugin install <plugin-name>@jcouball`.
 
 `claude plugin init` scaffolds a standalone plugin under `~/.claude/skills/`
