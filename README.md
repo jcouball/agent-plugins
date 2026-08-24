@@ -11,9 +11,10 @@ This repository is for the skills that follow me between repositories instead.
 ```
 /plugin marketplace add jcouball/agent-plugins
 /plugin install jcouball-writing@jcouball
+/plugin install jcouball-github@jcouball
 ```
 
-Run both once per machine.
+Run these once per machine.
 
 ## Plugins
 
@@ -23,6 +24,12 @@ Run both once per machine.
 | --- | --- | --- |
 | Skill | `unslop` | Removes AI writing tells from prose. Voice rules are tiered by surface, so PR descriptions get personality and YARD reference docs stay dry. |
 | Command | `/eli5` | Explains a concept, file, or error in plain language without paraphrasing the real technical terms. |
+
+### jcouball-github
+
+| Component | Name | What it does |
+| --- | --- | --- |
+| Skill | `resolve-feedback` | Works through unresolved PR review threads and the Copilot comments GitHub suppresses for low confidence, folds each fix into the commit that last touched the same file, and asks Copilot to look again. |
 
 ## Using these outside Claude Code
 
@@ -34,8 +41,9 @@ installing this one.
 
 ## Attribution
 
-`unslop` is derived from poteto's pstack plugin and is used under the MIT
-license. See `NOTICE` for the full attribution and the upstream commit it was
+`unslop` is derived from poteto's pstack plugin. `resolve-feedback` is derived
+from the skill of the same name in ruby-git. Both are used under the MIT
+license. See `NOTICE` for the full attribution and the upstream commit each was
 taken from.
 
 ## License
