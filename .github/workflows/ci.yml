@@ -7,8 +7,9 @@ permissions:
 on:
   push:
     branches: [main]
+  # Every pull request, whatever it targets. A pull request stacked on
+  # another branch needs checking just as much as one aimed at main.
   pull_request:
-    branches: [main]
 
 # Only the state after the latest push is worth checking.
 concurrency:
