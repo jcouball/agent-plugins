@@ -1,0 +1,23 @@
+{
+  "name": "jcouball-agent-plugins",
+  "private": true,
+  "description": "Tooling for the jcouball agent plugin marketplace. Not published.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "prepare": "husky",
+    "lint:manifests": "node scripts/check-manifests.mjs",
+    "lint:links": "node scripts/check-links.mjs",
+    "lint:commits": "commitlint --from origin/main --to HEAD",
+    "ci": "npm run lint:manifests && npm run lint:links && npm run lint:commits",
+    "sync": "node scripts/sync-plugins.mjs"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.0",
+    "@commitlint/config-conventional": "^19.8.0",
+    "husky": "^9.1.7"
+  }
+}
