@@ -85,3 +85,45 @@ Distributed under the following license:
     LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
     THE SOFTWARE.
+
+----------------------------------------------------------------------
+plugins/github/skills/rebase
+----------------------------------------------------------------------
+
+Derived from the "rebase" skill in the ruby-git project.
+
+    repo:   https://github.com/ruby-git/ruby-git
+    path:   .github/skills/rebase/SKILL.md
+    commit: 01b8680bd11300db0943801d45ddbac07d710c97
+
+The workflow, the section structure, and the Git commands are used
+verbatim. Removing the ruby-git specifics -- the 4.x branch, the sibling
+skill links, and the Copilot Chat framing -- is a local modification. So
+are the frontmatter note deferring to a project-local copy of the skill,
+and reading the base branch from origin/HEAD in place of the hardcoded
+origin/main. See the git history for the two commits that separate the
+vendored text from the changes.
+
+Distributed under the following license:
+
+    The MIT License
+
+    Copyright (c) 2008 Scott Chacon
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+    THE SOFTWARE.
