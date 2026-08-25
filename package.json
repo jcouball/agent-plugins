@@ -11,8 +11,9 @@
     "prepare": "husky",
     "lint:manifests": "node scripts/check-manifests.mjs",
     "lint:links": "node scripts/check-links.mjs",
+    "lint:actions": "node scripts/check-actions.mjs",
     "lint:commits": "commitlint --from origin/main --to HEAD",
-    "ci": "npm run lint:manifests && npm run lint:links && npm run lint:commits",
+    "ci": "npm run lint:manifests && npm run lint:links && npm run lint:actions && npm run lint:commits",
     "sync": "node scripts/sync-plugins.mjs"
   },
   "devDependencies": {
