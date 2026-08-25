@@ -150,4 +150,4 @@ if (problems.length > 0) {
   process.exit(1)
 }
 
-step('Done. Restart Claude Code to load the new version.')
+step('Done. Run /reload-plugins in a running session, or restart Claude Code.')

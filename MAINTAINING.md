@@ -74,8 +74,9 @@ plugins, and checks that the installed version and sha match `origin/main`. It
 reads the repository and never writes to it. Because the marketplace clone
 pulls from GitHub, only merged work can be installed.
 
-Restart Claude Code afterward. A running session keeps the version it started
-with.
+A running session keeps the version it started with until it is told otherwise.
+Run `/reload-plugins` to activate the new version in place, or restart Claude
+Code.
 
 ### How release-please finds the starting point
 

@@ -14,7 +14,32 @@ This repository is for the skills that follow me between repositories instead.
 /plugin install jcouball-github@jcouball
 ```
 
-Run these once per machine.
+Run these once per machine. They are Claude Code slash commands. The VS Code
+extension has no `/plugin`; it has `/plugins`, which opens the graphical
+manager. The same steps also run from a terminal:
+
+```bash
+claude plugin marketplace add jcouball/agent-plugins
+claude plugin install jcouball-writing@jcouball
+claude plugin install jcouball-github@jcouball
+```
+
+## Update
+
+```bash
+claude plugin marketplace update jcouball
+claude plugin update jcouball-writing@jcouball
+claude plugin update jcouball-github@jcouball
+```
+
+Refresh the marketplace first. Without it, `update` reads a stale cache and
+reports the plugin as already current. The plugin name has to carry the
+marketplace, `<plugin>@jcouball`, or the command reports the plugin as not
+found.
+
+A running session keeps the version it started with until it is told otherwise.
+Run `/reload-plugins` to activate the new version in place, or restart Claude
+Code.
 
 ## Plugins
 
