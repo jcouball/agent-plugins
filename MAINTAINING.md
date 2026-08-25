@@ -29,8 +29,38 @@ npm install
 ```
 
 Node 20 or newer. This installs commitlint and points git at the hooks in
-`.husky`, so it has to run once per clone or the hooks do nothing. There is no
-other toolchain. The checks are plain Node scripts with no dependencies.
+`.husky`, so it has to run once per clone or the hooks do nothing. The checks
+themselves are plain Node scripts with no dependencies.
+
+The one exception is actionlint, a Go binary. `npm run lint:actions` downloads
+the pinned release from GitHub, checks it against a checksum recorded in the
+script, runs it, and deletes it. A copy already on `PATH` is used instead when
+it reports the pinned version, so an actionlint you installed yourself — from
+Homebrew, `go install`, or the release page — skips the download entirely.
+
+Nothing is kept between runs. A cache would have to be keyed by version and
+platform both and populated without two runs racing to fill it, and it would
+buy nothing here: CI deletes `node_modules` before every job, and a maintainer
+with actionlint installed never reads it.
+
+The download covers macOS and Linux on x64 and arm64. Anywhere else — Windows,
+or a 32-bit or armv6 Linux — the check names the build it wanted and stops;
+install actionlint yourself and put it on `PATH`. Supporting one of those means
+adding its checksum, and for Windows a zip to unpack rather than a tarball.
+
+actionlint lints the shell inside `run:` steps by handing it to shellcheck,
+but only when shellcheck is on `PATH`. The Ubuntu runners have it, so a
+machine without it checks less than CI does; the check says so when it is
+missing. Installing shellcheck closes the gap; upstream lists packages for
+macOS, Linux, and Windows at
+<https://github.com/koalaman/shellcheck#installing>. The same applies to
+pyflakes and `shell: python` steps, which no workflow here uses — except that
+the pyflakes notice needs a POSIX shell and so never appears on Windows. The
+shellcheck notice does.
+
+Bumping the version means editing both the version and the checksums
+at the top of `scripts/check-actions.mjs`; the values come from
+`actionlint_<version>_checksums.txt` in the release.
 
 ## Making a change
 
@@ -107,7 +137,7 @@ untagged and let the first release pull request bump past it.
 npm run ci
 ```
 
-Three checks, each runnable on its own:
+Four checks, each runnable on its own:
 
 - `npm run lint:manifests` compares the marketplace manifest, the plugin
   manifests, and the skills on disk against each other, and fails when a skill
@@ -116,6 +146,9 @@ Three checks, each runnable on its own:
 - `npm run lint:links` resolves every relative markdown link. External URLs are
   left alone, since the links that rot here are the ones naming files in this
   repository.
+- `npm run lint:actions` runs actionlint over `.github/workflows/`, which
+  catches broken expressions, undefined contexts, bad `runs-on` labels, and
+  wrong action inputs before a push finds them.
 - `npm run lint:commits` runs commitlint over the commits not yet on `main`.
 
 CI runs the same checks in two jobs, `Lint and Validate` and

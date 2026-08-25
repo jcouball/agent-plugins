@@ -40,3 +40,6 @@ jobs:
 
       - name: Check markdown links
         run: npm run lint:links
+
+      - name: Lint GitHub Actions workflows
+        run: npm run lint:actions
