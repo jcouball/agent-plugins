@@ -1,7 +1,7 @@
 {
   "name": "jcouball-github",
   "version": "1.0.0",
-  "description": "GitHub pull request workflow tools. Resolves PR review feedback and suppressed Copilot comments, folds fixes into the commits that introduced them, and requests fresh Copilot reviews.",
+  "description": "GitHub pull request workflow tools. Resolves PR review feedback and suppressed Copilot comments, folds fixes into the commits that introduced them, requests fresh Copilot reviews, and rebases a branch onto the default branch without opening an editor.",
   "author": {
     "name": "James Couball"
   },
@@ -13,9 +13,11 @@
     "pull-request",
     "review",
     "copilot",
-    "workflow"
+    "workflow",
+    "rebase"
   ],
   "skills": [
-    "./skills/resolve-feedback"
+    "./skills/resolve-feedback",
+    "./skills/rebase"
   ]
 }
