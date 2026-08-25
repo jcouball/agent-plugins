@@ -157,9 +157,22 @@ The pipeline sorts the matching reviews by `submitted_at` and keeps only the
 last one — the listing order of `/pulls/.../reviews` is not guaranteed, and
 suppressed sections in earlier reviews describe superseded revisions of the
 code. The `-r` flag prints the body as raw text (real newlines instead of a
-JSON-escaped string) under a one-line header identifying the review. For each
-suppressed comment, record the file path, the line reference, and the comment
-text from the section body.
+JSON-escaped string) under a one-line header identifying the review.
+
+Note the pipe into `jq -s`, rather than `gh --jq`. With `--paginate`, `gh`
+applies `--jq` to each page separately, so anything that aggregates — a
+`length`, a `sort_by`, a `last` — runs per page and emits one result per page
+instead of one overall. Slurping with `-s` collects the pages into one array,
+and `add` concatenates them into a single list so the aggregation runs once
+across every item.
+
+The `add` step depends on each page being an array, which is what the list
+endpoints used here return — reviews, comments, the timeline. Use this form
+whenever a `--paginate` response is a list per page and is reduced to a single
+value; an endpoint that pages an object needs a different fold.
+
+For each suppressed comment, record the file path, the line reference, and the
+comment text from the section body.
 
 Before triaging, check each suppressed comment against the current working
 tree: line numbers in an older review body may have drifted, and a later push
@@ -306,12 +319,88 @@ disagreed) goes into the final summary instead.
 
 ## Step 9: Request another Copilot review
 
-Request a fresh Copilot review on the PR so it re-reviews the amended commits.
+By default GitHub does not re-review on its own. Pushing, force-pushing, or
+resolving a thread does not trigger Copilot, so the review has to be requested
+every round, and a Copilot review appearing after a push means someone asked
+for it. The exception is a repository carrying the ruleset described at the end
+of this step, which reviews every push without being asked.
 
-- Preferred: activate the pull request management tools, then request a Copilot
-  review via the GitHub pull request tooling (`request_copilot_review`).
-- Do **not** create a new Copilot PR task for a re-review; that opens separate
-  work instead of re-reviewing this PR.
+Check that the pull request is open, then request the review. A closed or
+merged pull request accepts the request and silently discards it, so a zero
+exit status on its own proves nothing:
+
+```bash
+if ! state=$(gh pr view "$PR_NUMBER" --json state --jq .state) || [ -z "$state" ]; then
+  echo "could not read the pull request state; no review requested" >&2
+  exit 1
+fi
+
+if [ "$state" = "OPEN" ]; then
+  gh pr edit "$PR_NUMBER" --add-reviewer @copilot
+else
+  echo "pull request is $state; the request would be discarded" >&2
+fi
+```
+
+Check the lookup itself, not just its answer. `state=$(gh pr view ...)` leaves
+`state` empty when the call fails — no network, expired auth, wrong repository
+— and an empty string is not `OPEN`, so a plain `if/else` takes the branch that
+reports a closed pull request and exits zero. That is the same silent no-op
+this step exists to remove, reintroduced one line above the fix. Failing the
+lookup and finding the pull request closed are different outcomes and get
+different exits: the first is an error, the second a deliberate skip.
+
+Do not try to confirm afterwards that the request registered. GitHub treats a
+second request for an already-pending reviewer as a no-op, so no API response
+distinguishes "my request landed" from "one was already outstanding". Two
+attempts that look like they work and do not, recorded so they are not
+rediscovered:
+
+- `pulls/<pr>/requested_reviewers` does not list Copilot even while its request
+  is pending. It answers `{"users":[],"teams":[]}` immediately after a request
+  the timeline does record, so reading it as confirmation reports failure on a
+  request that succeeded. Do not generalize this to bots at large: GitHub does
+  represent bots as users, and the timeline returns
+  `{"login":"Copilot","type":"Bot"}` in a user-shaped `requested_reviewer`
+  field. This is the observed behavior of one endpoint for one reviewer, not a
+  rule about the API.
+- Counting `review_requested` timeline events and requiring the count to rise
+  reports a false negative whenever a request is already outstanding, because
+  the duplicate records no new event.
+
+A review that never arrives is self-evident on the next run of this skill —
+there is no new feedback to resolve.
+
+The timeline names this bot `Copilot`, while the REST call below takes
+`copilot-pull-request-reviewer[bot]`. Both are correct — they are different API
+surfaces for the same bot, so do not "fix" one to match the other.
+
+If `gh` is too old to know `@copilot`, the REST call it makes is:
+
+```bash
+gh api "repos/$OWNER/$REPO/pulls/$PR_NUMBER/requested_reviewers" \
+  -X POST -f 'reviewers[]=copilot-pull-request-reviewer[bot]'
+```
+
+The `[bot]` suffix is required. Without it GitHub answers `422 Reviews may only
+be requested from collaborators`, which reads like a permissions problem and is
+not one.
+
+Two dead ends, recorded so they are not rediscovered:
+
+- The GraphQL `requestReviews` mutation cannot do this. Its `userIds` field
+  rejects a `Bot` node ID with `Could not resolve to User node`, and the input
+  has no field that takes one.
+- `suggestedActors(capabilities: [CAN_BE_ASSIGNED])` returns `copilot-swe-agent`,
+  the coding agent, not `copilot-pull-request-reviewer`. They are different
+  bots with different node IDs.
+
+Do **not** create a new Copilot PR task for a re-review; that opens separate
+work instead of re-reviewing this PR.
+
+To remove this step altogether, enable a repository ruleset on the base branch
+with Copilot code review and its "Review new pushes" option. Copilot then
+reviews every push without being asked.
 
 Finish by reporting to the user: the threads resolved, any threads left open and
 why, the disposition of each suppressed comment, the new commit list, and the
@@ -328,3 +417,7 @@ PR URL.
 | No review body contains a suppressed section | Copilot suppressed nothing on this PR; continue with the unresolved threads alone. |
 | A suppressed comment's line reference does not match the current code | Locate the referenced code in the current tree, or drop the comment as no longer applicable and note it in the summary. |
 | Unsure whether to push back on feedback | Stop and ask the user before replying or resolving. |
+| `--add-reviewer @copilot` reports success but no review arrives | The request is dropped on a closed or merged PR. Check the state before requesting, as Step 9 does. |
+| `requested_reviewers` is empty after requesting Copilot | Expected. Copilot does not appear there even while the request is pending, so it is not a confirmation route. See Step 9. |
+| `422 Reviews may only be requested from collaborators` | The `[bot]` suffix is missing from `copilot-pull-request-reviewer[bot]`. It is not a permissions problem. |
+| Copilot has not re-reviewed after a push | It does not by default. Request it every round, or enable the "Review new pushes" ruleset. |
