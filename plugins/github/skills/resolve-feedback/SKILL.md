@@ -49,10 +49,10 @@ history-rewriting force-push (Step 7).
 - **Unresolved review thread** — a PR review thread whose `isResolved` is
   `false` in the GitHub GraphQL API.
 - **Suppressed comment** — a comment Copilot withheld from the thread list,
-  embedded in a review body under a "Comments suppressed due to low confidence"
-  `<details>` section. It has no thread ID or comment ID, so it can be neither
-  replied to nor resolved — its disposition is reported in the final summary
-  instead (Step 9).
+  embedded in a review body in a `<details>` block headed "Suppressed comments
+  (N)", either as the block's `<summary>` or as a markdown heading inside it.
+  It has no thread ID or comment ID, so it can be neither replied to nor
+  resolved — its disposition is reported in the final summary instead (Step 9).
 - **Base** — the merge-base between the PR base branch and `HEAD`, computed with
   `git merge-base origin/<base-branch> HEAD`. All commit lookups are scoped to
   `<base>..HEAD` so only this branch's commits are considered.
@@ -137,21 +137,85 @@ first comment `databaseId` (needed to reply), the `path`, and the `line`.
 ## Step 3: Fetch suppressed comments
 
 Copilot omits low-confidence findings from the thread list and instead embeds
-them in its review body under a `<details>` section titled "Comments suppressed
-due to low confidence". Print the newest review whose body contains that
-section (guarding against null bodies, and matching the exact section title so
-reviews that merely mention the word "suppressed" do not match), then read the
-section out of the printed body:
+them in its review body, in a `<details>` block headed "Suppressed comments
+(N)". It has two templates for that block and uses both:
+
+```text
+<details>                                    <details>
+<summary>Suppressed comments (1)</summary>   <summary>Review details</summary>
+
+**path/to/file.rb:731**                      ### Suppressed comments (1)
+* the finding...
+                                             **path/to/file.md:336**
+                                             * the finding...
+```
+
+On the left the `<summary>` is the marker and there is no heading at all. On
+the right the `<details>` is a general "Review details" wrapper and a markdown
+heading marks the section inside it. Which one appears tracks the shape of the
+body around it — a review opening `## Pull request overview` uses the left
+form, one opening with a verdict line such as `### 🔵 Needs a closer look` uses
+the right — so both are current and the filter has to accept either. Print the
+newest review whose body carries the section, then read it out of the printed
+body:
 
 ```bash
 gh api "repos/$OWNER/$REPO/pulls/$PR_NUMBER/reviews" --paginate |
   jq -sr 'add
-    | map(select((.body // "")
-      | contains("Comments suppressed due to low confidence")))
-    | sort_by(.submitted_at)
-    | last // empty
-    | "review \(.id) by \(.user.login) at \(.submitted_at)\n\n\(.body)"'
+    | (map(select((.user.login // "")
+        | startswith("copilot-pull-request-reviewer")))) as $copilot
+    | ($copilot | map(select((.body // "")
+        | test("(^|\n)(#{1,6} *|<summary> *)Suppressed comments"; "i")))) as $hits
+    | "scanned \($copilot|length) Copilot review(s); \($hits|length) carry a suppressed section",
+      ($hits | sort_by(.submitted_at) | last // empty
+        | "\nreview \(.id) by \(.user.login) at \(.submitted_at)\n\n\(.body)")'
 ```
+
+Restrict the scan to Copilot before matching anything. Only Copilot writes a
+suppressed section, but `/pulls/.../reviews` returns every review on the pull
+request, and a reply posted through this skill's own Step 8 creates a review
+record too — this pull request has ten of them. Counting those inflates the
+denominator with reviews that could never match, and worse, a human review that
+quotes either marker, which is what happens the moment someone pastes a
+suppressed section into a review to discuss it, sorts to `last` and prints in
+place of Copilot's. `startswith` covers the login with and without its `[bot]`
+suffix.
+
+Read the count line before the body. It is there because the failure this
+filter is prone to is silent: a filter that matches nothing and a pull request
+with nothing suppressed produce the same empty output. Counting only Copilot's
+reviews is what makes the number worth reading — `0 of 11` says something,
+`0 of 21` where ten are your own replies does not.
+
+The count does not tell those two apart, and must not be read as if it did.
+Copilot suppresses nothing on plenty of reviews, so `scanned 17 review(s); 0
+carry a suppressed section` is a perfectly ordinary result and is not evidence
+of drift. What the count does is make the ambiguity visible where the bare
+empty output hid it. Treat a zero as a reason to open one review body and look
+for the section yourself, and do that before reporting no suppressed comments
+on a pull request Copilot has reviewed several times. This step has been wrong
+twice in exactly that way. It first searched for "Comments suppressed due to
+low confidence", a string Copilot does not emit anywhere; then it anchored on
+the markdown heading alone, which matched every sample in this repository and
+none of the eighteen sections across eight pull requests in ruby-git, every one
+of which uses the `<summary>` form. Both versions reported "no suppressed
+comments" and neither looked broken. Sample a second repository before
+believing a pattern generalizes.
+
+Match the marker, not the word. Two loosenings are tempting and both are wrong:
+
+- Matching the word "suppressed" anywhere in the body. Copilot quotes the lines
+  it is commenting on, so reviewing a file that discusses suppressed comments —
+  this one has two dozen such lines — puts the word in a body that has no
+  section. That is not merely a wasted match: the pipeline takes `last` of what
+  survives the filter, so a false positive on a *newer* review hides the real
+  section on an older one. Loosening the pattern turns into a miss.
+- Requiring the exact heading including its `(N)` count. The count is not
+  evidence of anything, and pinning the format of a number and its parentheses
+  adds a way to break for no gain.
+
+`#{1,6}` accepts any heading level, and the `"i"` flag any capitalization, which
+is as much slack as can be given without matching prose.
 
 The pipeline sorts the matching reviews by `submitted_at` and keeps only the
 last one — the listing order of `/pulls/.../reviews` is not guaranteed, and
@@ -414,7 +478,7 @@ PR URL.
 | Rebase stops with conflicts | Resolve the conflict, `git add` the files, then `git rebase --continue`. |
 | Force-push rejected despite `--force-with-lease` | The remote branch moved; run `git fetch`, review the remote changes, reconcile, and retry. |
 | A thread has no obvious file/line (`path` is null) | It is a PR-level comment; reply at the PR level and resolve only if addressed. |
-| No review body contains a suppressed section | Copilot suppressed nothing on this PR; continue with the unresolved threads alone. |
+| No review body contains a suppressed section | Most often correct: Copilot suppresses nothing on many reviews. The count line cannot tell that apart from a pattern that has drifted, so open one review body and look for the heading before reporting none. |
 | A suppressed comment's line reference does not match the current code | Locate the referenced code in the current tree, or drop the comment as no longer applicable and note it in the summary. |
 | Unsure whether to push back on feedback | Stop and ask the user before replying or resolving. |
 | `--add-reviewer @copilot` reports success but no review arrives | The request is dropped on a closed or merged PR. Check the state before requesting, as Step 9 does. |
