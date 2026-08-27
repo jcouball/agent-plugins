@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/jcouball/agent-plugins/compare/writing-v1.2.0...writing-v1.3.0) (2026-08-27)
+
+
+### Features
+
+* **unslop:** Read project-local overrides in unslop ([8575ee2](https://github.com/jcouball/agent-plugins/commit/8575ee2fea165500f8bca370eca713804634637a))
+
 ## [1.2.0](https://github.com/jcouball/agent-plugins/compare/writing-v1.1.0...writing-v1.2.0) (2026-08-27)
 
 
