@@ -54,7 +54,7 @@ Code.
 
 | Component | Name | What it does |
 | --- | --- | --- |
-| Skill | `resolve-feedback` | Works through unresolved PR review threads and the Copilot comments GitHub suppresses for low confidence, folds each fix into the commit that last touched the same file, and asks Copilot to look again. |
+| Skill | `resolve-pr-feedback` | Works through unresolved PR review threads and the Copilot comments GitHub suppresses for low confidence, folds each fix into the commit that last touched the same file, and asks Copilot to look again. |
 | Skill | `rebase` | Rebases the current branch onto the default branch, walks through any conflicts, and force-pushes with lease. Every Git command runs without opening an editor. |
 
 ## Using these outside Claude Code
@@ -67,10 +67,9 @@ installing this one.
 
 ## Attribution
 
-`unslop` is derived from poteto's pstack plugin. `resolve-feedback` and
-`rebase` are derived from the skills of the same names in ruby-git. All three
-are used under the MIT license. See [NOTICE.md](NOTICE.md) for the full
-attribution and the upstream commit each was taken from.
+`unslop` is derived from poteto's pstack plugin and used under the MIT
+license. See [NOTICE.md](NOTICE.md) for the full attribution and the upstream
+commit it was taken from.
 
 ## License
 
