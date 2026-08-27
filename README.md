@@ -63,7 +63,7 @@ Code.
 | Component | Name | What it does |
 | --- | --- | --- |
 | Skill | `unslop` | Removes AI writing tells from prose. Voice rules are tiered by surface, so PR descriptions get personality and YARD reference docs stay dry. |
-| Command | `/eli5` | Explains a concept, file, or error in plain language without paraphrasing the real technical terms. |
+| Command | `/eli5 <topic>` | Explains a concept, file, or error in plain language without paraphrasing the real technical terms. |
 
 ### jcouball-github
 
@@ -76,11 +76,11 @@ Code.
 
 | Component | Name | What it does |
 | --- | --- | --- |
-| Command | `/promote-skill` | Moves a full project skill into this marketplace, generalizes it, and leaves a thin project-local override file behind. |
-| Command | `/add-overrides` | Creates a project-local override file for a skill that lives in this marketplace, holding only the project's changes and additions. |
-| Command | `/add-skill` | Adds a new skill to a plugin here: frontmatter, manifest declaration, trigger-worded description, and the project-overrides contract. |
-| Command | `/vendor-skill` | Vendors a third-party skill in two commits — upstream byte for byte, then local modifications — with provenance in NOTICE.md. |
-| Command | `/update-vendored-skill` | Ports upstream changes into a vendored skill by hand, diffing the two upstream versions and updating NOTICE.md. |
+| Command | `/promote-skill <skill> <plugin>` | Moves a full project skill into this marketplace, generalizes it, and leaves a thin project-local override file behind. |
+| Command | `/add-overrides <skill>` | Creates a project-local override file for a skill that lives in this marketplace, holding only the project's changes and additions. |
+| Command | `/add-skill <plugin> <skill>` | Adds a new skill to a plugin here: frontmatter, manifest declaration, trigger-worded description, and the project-overrides contract. |
+| Command | `/vendor-skill <repo> <path> <plugin>` | Vendors a third-party skill in two commits — upstream byte for byte, then local modifications — with provenance in NOTICE.md. |
+| Command | `/update-vendored-skill <skill>` | Ports upstream changes into a vendored skill by hand, diffing the two upstream versions and updating NOTICE.md. |
 
 ## Using these outside Claude Code
 
