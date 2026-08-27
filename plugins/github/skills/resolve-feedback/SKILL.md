@@ -330,13 +330,12 @@ before retrying; do not use `--force` to override the lease.
 
 ## Step 8: Reply to and resolve threads
 
-For each thread that is now addressed:
-
-1. Reply to the thread, referencing what changed. Keep reply bodies shell-safe:
-   use single quotes for simple one-line replies, or assign a quoted heredoc to a
-   variable for arbitrary text. Do not put human-written reply text directly in a
-   double-quoted shell argument; review comments can contain characters such as
-   `!`, `$`, backticks, or quotes that the shell may expand before `gh` runs.
+For each thread that is now addressed, first reply to the thread, referencing
+what changed. Keep reply bodies shell-safe: use single quotes for simple
+one-line replies, or assign a quoted heredoc to a variable for arbitrary text.
+Do not put human-written reply text directly in a double-quoted shell argument;
+review comments can contain characters such as `!`, `$`, backticks, or quotes
+that the shell may expand before `gh` runs.
 
 ```bash
 COMMENT_DATABASE_ID=COMMENT_DATABASE_ID_FROM_THREAD
@@ -362,16 +361,16 @@ gh api \
   -f body="$reply_body"
 ```
 
-2. Resolve the thread:
+Then resolve the thread:
 
-   ```bash
-   gh api graphql -f query='
-     mutation($threadId:ID!) {
-       resolveReviewThread(input:{threadId:$threadId}) {
-         thread { id isResolved }
-       }
-     }' -F threadId=THREAD_ID
-   ```
+```bash
+gh api graphql -f query='
+  mutation($threadId:ID!) {
+    resolveReviewThread(input:{threadId:$threadId}) {
+      thread { id isResolved }
+    }
+  }' -F threadId=THREAD_ID
+```
 
 Only resolve threads whose feedback was actually addressed (or that the user
 agreed to close after a reply). Leave threads open when the user still owes a
