@@ -1,0 +1,7 @@
+# What markdownlint checks. Rule settings live in .markdownlint.yml.
+globs:
+  - "**/*.md"
+ignores:
+  - node_modules
+  # Written by release-please, not by hand.
+  - "plugins/*/CHANGELOG.md"

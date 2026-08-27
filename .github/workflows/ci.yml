@@ -43,3 +43,6 @@ jobs:
 
       - name: Lint GitHub Actions workflows
         run: npm run lint:actions
+
+      - name: Lint markdown
+        run: npm run lint:markdown

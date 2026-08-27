@@ -28,9 +28,14 @@ across marketplaces. That is why the directory is `writing` and the name is
 npm install
 ```
 
-Node 20 or newer. This installs commitlint and points git at the hooks in
-`.husky`, so it has to run once per clone or the hooks do nothing. The checks
-themselves are plain Node scripts with no dependencies.
+No Node version is claimed here, because a claim goes stale the moment a
+dependency raises its own floor. Instead `.npmrc` sets `engine-strict`, so an
+install under a Node too old for any package fails at once and names the
+package that wants more. CI pins its version in `ci.yml`.
+
+The install puts commitlint and markdownlint in place and points git at the
+hooks in `.husky`, so it has to run once per clone or the hooks do nothing.
+The checks under `scripts/` are plain Node scripts with no dependencies.
 
 The one exception is actionlint, a Go binary. `npm run lint:actions` downloads
 the pinned release from GitHub, checks it against a checksum recorded in the
@@ -137,7 +142,7 @@ untagged and let the first release pull request bump past it.
 npm run ci
 ```
 
-Four checks, each runnable on its own:
+Five checks, each runnable on its own:
 
 - `npm run lint:manifests` compares the marketplace manifest, the plugin
   manifests, and the skills on disk against each other, and fails when a skill
@@ -149,6 +154,11 @@ Four checks, each runnable on its own:
 - `npm run lint:actions` runs actionlint over `.github/workflows/`, which
   catches broken expressions, undefined contexts, bad `runs-on` labels, and
   wrong action inputs before a push finds them.
+- `npm run lint:markdown` runs markdownlint-cli2 over every markdown file.
+  Rule settings live in `.markdownlint.yml`; the globs and ignores live in
+  `.markdownlint-cli2.yaml`, which skips the release-please changelogs.
+  Command files get their own nested config that drops the first-line-heading
+  rule, since they are prompts, not documents.
 - `npm run lint:commits` runs commitlint over the commits not yet on `main`.
 
 CI runs the same checks in two jobs, `Lint and Validate` and

@@ -1,0 +1,4 @@
+extends: ../../../.markdownlint.yml
+
+# Command files are prompts with frontmatter, not documents. No h1 required.
+MD041: false
