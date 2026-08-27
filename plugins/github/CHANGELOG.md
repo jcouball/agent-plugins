@@ -1,5 +1,22 @@
 # Changelog
 
+## [2.0.0](https://github.com/jcouball/agent-plugins/compare/github-v1.1.1...github-v2.0.0) (2026-08-27)
+
+
+### ⚠ BREAKING CHANGES
+
+* **github:** rename the resolve-feedback skill to resolve-pr-feedback
+
+### Features
+
+* **github:** Read project-local overrides in resolve-pr-feedback ([3fb88e8](https://github.com/jcouball/agent-plugins/commit/3fb88e8100cbad26c501612797eb448fa2814ded))
+* **github:** Rename the resolve-feedback skill to resolve-pr-feedback ([4ebe562](https://github.com/jcouball/agent-plugins/commit/4ebe56229851c7ed2c00beb00e818c7b5bbb8a15))
+
+
+### Bug Fixes
+
+* **resolve-feedback:** Keep step 8 code blocks out of the ordered list ([c713741](https://github.com/jcouball/agent-plugins/commit/c71374177e28c33c8930d681296d62aeeb4a1373))
+
 ## [1.1.1](https://github.com/jcouball/agent-plugins/compare/github-v1.1.0...github-v1.1.1) (2026-08-26)
 
 
