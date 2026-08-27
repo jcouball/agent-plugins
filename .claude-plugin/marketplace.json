@@ -25,6 +25,16 @@
       "category": "development",
       "source": "./plugins/github",
       "homepage": "https://github.com/jcouball/agent-plugins"
+    },
+    {
+      "name": "jcouball-marketplace",
+      "description": "Commands for maintaining the jcouball marketplace itself: promote a full project skill into the marketplace, or add a thin project-local override file for a skill that already lives there.",
+      "author": {
+        "name": "James Couball"
+      },
+      "category": "development",
+      "source": "./plugins/marketplace",
+      "homepage": "https://github.com/jcouball/agent-plugins"
     }
   ]
 }

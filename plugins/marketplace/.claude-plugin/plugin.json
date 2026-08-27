@@ -1,0 +1,17 @@
+{
+  "name": "jcouball-marketplace",
+  "version": "1.0.0",
+  "description": "Commands for the pointer-plus-overrides skill model: promote a project skill into the jcouball marketplace, or add a project-local override file for a skill that already lives there.",
+  "author": {
+    "name": "James Couball"
+  },
+  "homepage": "https://github.com/jcouball/agent-plugins",
+  "repository": "https://github.com/jcouball/agent-plugins",
+  "license": "MIT",
+  "keywords": [
+    "marketplace",
+    "skills",
+    "overrides",
+    "migration"
+  ]
+}
