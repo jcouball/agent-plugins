@@ -24,9 +24,9 @@ current project is not it, stop and say so.
    (never a vendored copy of the skill itself), applies the changes and
    additions from the first file found with the project file winning on
    conflict, and refuses to re-read or re-invoke the file that invoked it.
-   Copy the wording from the resolve-pr-feedback skill's Step 0, but list
+   Copy the wording from the address-pr-feedback skill's Step 0, but list
    only the two paths above with the new skill's name — the extra alias
-   path there is specific to that skill's history — and end the description
+   paths there are specific to that skill's history — and end the description
    with its sentence pointing at that step. Commands do not carry the
    contract; it is for skills only.
 5. Run `npm run ci` and fix anything it reports.

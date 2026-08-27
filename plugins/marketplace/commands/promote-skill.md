@@ -5,7 +5,7 @@ argument-hint: "[skill and destination plugin — e.g. my-skill github]"
 
 Move the skill named in `$ARGUMENTS` from this project into the named plugin
 in the jcouball/agent-plugins marketplace, leaving a project-local override
-file here, following the model used for resolve-pr-feedback. If `$ARGUMENTS`
+file here, following the model used for address-pr-feedback. If `$ARGUMENTS`
 does not name both the skill and the destination plugin, ask before doing
 anything.
 
@@ -37,7 +37,7 @@ In jcouball/agent-plugins:
    skill in the plugin manifest and give the description trigger words.
 3. Also in the second commit, add a "Step 0: Apply project overrides"
    section as the first workflow step, modeled on the one in
-   resolve-pr-feedback: check .claude/skills/<skill-name>/SKILL.md and then
+   address-pr-feedback: check .claude/skills/<skill-name>/SKILL.md and then
    .github/skills/<skill-name>/SKILL.md, falling back to a SKILL.md whose
    frontmatter name is <skill-name> anywhere else the project keeps agent
    skills — never a vendored copy of the skill itself — and use only the
@@ -56,7 +56,7 @@ In jcouball/agent-plugins:
    Back in this project, only after that release is installed:
 
 6. Reduce the local skill to a pointer plus deltas, modeled on ruby-git's
-   .github/skills/resolve-pr-feedback/SKILL.md: keep the frontmatter (name
+   .claude/skills/address-pr-feedback/SKILL.md: keep the frontmatter (name
    matching the directory, a trigger-rich description); say to invoke
    /<marketplace-qualified-skill> and apply the changes below throughout
    its workflow; add the guard "if you arrived here because that skill told

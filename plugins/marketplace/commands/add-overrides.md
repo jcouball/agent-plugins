@@ -5,12 +5,12 @@ argument-hint: "[skill-name — the marketplace skill to override]"
 
 Create a project-local override file for the `$ARGUMENTS` skill from the
 jcouball/agent-plugins marketplace, following the model used for
-resolve-pr-feedback. If `$ARGUMENTS` is empty, ask which marketplace skill
+address-pr-feedback. If `$ARGUMENTS` is empty, ask which marketplace skill
 to override before doing anything.
 
 1. Confirm the plugin skill has its project-overrides hook: a step at the
    start of its workflow that names the project paths it checks. The label
-   varies — resolve-pr-feedback calls it "Step 0", unslop numbers it 0 in
+   varies — address-pr-feedback calls it "Step 0", unslop numbers it 0 in
    its Process list — so look for the path check, not the word "Step".
    Every skill in the marketplace carries the hook by convention, so a
    missing one is a gap in the plugin: add it there first, following step 3
