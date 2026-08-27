@@ -179,6 +179,9 @@ for (const plugin of pluginDirectories) {
   const commands = join(root, 'plugins', plugin, 'commands')
   if (existsSync(commands)) {
     for (const file of readdirSync(commands)) {
+      // Dotfiles are tool config (a nested .markdownlint.yml, a stray
+      // .DS_Store), not commands.
+      if (file.startsWith('.')) continue
       if (!file.endsWith('.md')) fail(`command file is not markdown: plugins/${plugin}/commands/${file}`)
     }
   }
