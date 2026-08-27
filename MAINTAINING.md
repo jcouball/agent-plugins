@@ -213,15 +213,45 @@ Delete those directories by hand if they accumulate.
 Land it in two commits, always.
 
 1. The upstream file, byte for byte, with no local changes. Record the source
-   repository, path, and commit in `NOTICE`.
+   repository, path, and commit in `NOTICE.md`.
 2. Every local modification, with the reasoning in the commit body.
 
 `git diff <vendor-commit> <modify-commit>` then answers what was changed
-locally, and a future upstream bump rebases against a clean base. A prose file
-recording the same thing drifts the first time someone edits the skill and
-forgets to update it.
+locally. A prose file recording the same thing drifts the first time someone
+edits the skill and forgets to update it — which is why `NOTICE.md` records
+only the source and the upstream commit, and describes the local changes not
+at all. The git history is the record of those.
 
-Check the upstream license before vendoring, and carry its notice in `NOTICE`.
+Check the upstream license before vendoring, and carry its notice in `NOTICE.md`.
+
+Local modifications may include formatting: a vendored file is linted like any
+other, so rewrapping for line length or renumbering for stable IDs is fine, as
+long as it lands in its own commit with no wording changes mixed in.
+
+### Updating a vendored skill
+
+The local copy drifts from upstream on purpose — reformatting, dropped
+sections, local fixes — so an upstream update is ported by hand, not merged.
+`NOTICE.md` records the upstream commit last reviewed.
+
+1. Fetch the file at the recorded commit and at the new upstream head:
+
+   ```bash
+   gh api 'repos/<owner>/<repo>/contents/<path>?ref=<sha>' --jq .content | base64 -d
+   ```
+
+2. Diff the two upstream versions. Local changes never appear in that diff, so
+   it shows exactly what upstream changed and nothing else.
+3. Port the hunks worth taking into the local file, applying this repository's
+   formatting as you go. `git merge-file <local> <old> <new>` auto-applies
+   hunks in regions with no local changes and leaves conflict markers where
+   they collide.
+4. Run `npm run ci`.
+5. Update the commit recorded in `NOTICE.md`.
+6. Commit once, scoped to the plugin, naming the upstream range in the body.
+   Use `feat` or `fix`, not `chore`: a `chore` never triggers a release, and
+   content on `main` without a version bump leaves installs pinned to the old
+   commit (see the `npm run sync` gotcha below).
 
 ## Command line gotchas
 

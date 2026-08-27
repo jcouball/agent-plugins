@@ -69,8 +69,8 @@ installing this one.
 
 `unslop` is derived from poteto's pstack plugin. `resolve-feedback` and
 `rebase` are derived from the skills of the same names in ruby-git. All three
-are used under the MIT license. See `NOTICE` for the full attribution and the
-upstream commit each was taken from.
+are used under the MIT license. See [NOTICE.md](NOTICE.md) for the full
+attribution and the upstream commit each was taken from.
 
 ## License
 
