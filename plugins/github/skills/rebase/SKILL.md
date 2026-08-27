@@ -1,6 +1,6 @@
 ---
 name: rebase
-description: 'Rebases the current branch onto the default branch on origin, resolves rebase conflicts, and force-pushes with lease using non-interactive Git commands that never open an editor. Use when updating a feature branch from the default branch, handling rebase conflicts, or rewriting branch history before updating a pull request. If the current project has its own rebase skill, use the project''s version instead of this one.'
+description: 'Rebases the current branch onto the default branch on origin, resolves rebase conflicts, and force-pushes with lease using non-interactive Git commands that never open an editor. Use when updating a feature branch from the default branch, handling rebase conflicts, or rewriting branch history before updating a pull request. If the current project has its own rebase skill, that file holds project-specific changes and additions: still run this skill, and apply those changes on top (Step 0).'
 ---
 
 # Rebase
@@ -16,6 +16,7 @@ force-push the rewritten history without opening an editor.
 - [Terms](#terms)
 - [Safety rules](#safety-rules)
 - [Workflow](#workflow)
+- [Step 0: Apply project overrides](#step-0-apply-project-overrides)
 - [Step 1: Preflight checks and fetch](#step-1-preflight-checks-and-fetch)
 - [Step 2: Start the rebase](#step-2-start-the-rebase)
 - [Step 3: Resolve conflicts and continue](#step-3-resolve-conflicts-and-continue)
@@ -53,11 +54,35 @@ These rules are mandatory:
 
 ## Workflow
 
+0. [Apply project overrides](#step-0-apply-project-overrides)
 1. [Preflight checks and fetch](#step-1-preflight-checks-and-fetch)
 2. [Start the rebase](#step-2-start-the-rebase)
 3. [Resolve conflicts and continue](#step-3-resolve-conflicts-and-continue)
 4. [Verify the rebased branch](#step-4-verify-the-rebased-branch)
 5. [Force-push with lease](#step-5-force-push-with-lease)
+
+## Step 0: Apply project overrides
+
+A project may carry its own thin copy of this workflow holding only its local
+changes and additions — extra protected branches, checks to run before the
+force-push. Check for one at each of these paths and use the first that
+exists:
+
+- `.claude/skills/rebase/SKILL.md`
+- `.github/skills/rebase/SKILL.md`
+
+If one exists, read it and apply its changes and additions throughout the
+workflow. Where it conflicts with this skill, the project file wins. If that
+file is what invoked this skill, its changes are already in context — do not
+re-read it, and do not re-invoke anything it names.
+
+If neither path exists, fall back to searching the project for a `SKILL.md`
+whose frontmatter `name` is `rebase` wherever the project keeps agent skills,
+and treat it the same way. Never treat a vendored or installed copy of this
+skill itself as the override — a full copy of the workflow holds no project
+deltas.
+
+If no override exists, run this skill as written.
 
 ## Step 1: Preflight checks and fetch
 
