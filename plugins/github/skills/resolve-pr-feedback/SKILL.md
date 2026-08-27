@@ -1,6 +1,6 @@
 ---
 name: resolve-pr-feedback
-description: 'Resolves unresolved pull request review threads and suppressed (low-confidence) Copilot review comments on the current branch, folds each fix into the existing commit that last touched the same file, force-pushes with lease, and requests a fresh Copilot review. Use when addressing PR feedback, resolving review comments or threads, handling comments suppressed due to low confidence, amending fixes into prior commits, or asking Copilot to re-review after changes. If the current project has its own resolve-feedback skill, use the project''s version instead of this one.'
+description: 'Resolves unresolved pull request review threads and suppressed (low-confidence) Copilot review comments on the current branch, folds each fix into the existing commit that last touched the same file, force-pushes with lease, and requests a fresh Copilot review. Use when addressing PR feedback, resolving review comments or threads, handling comments suppressed due to low confidence, amending fixes into prior commits, or asking Copilot to re-review after changes. If the current project has its own resolve-feedback or resolve-pr-feedback skill, that file holds project-specific changes and additions: still run this skill, and apply those changes on top (Step 0).'
 ---
 
 # Resolve PR Feedback
@@ -18,6 +18,7 @@ review.
 - [Terms](#terms)
 - [Safety and stop points](#safety-and-stop-points)
 - [Workflow](#workflow)
+- [Step 0: Apply project overrides](#step-0-apply-project-overrides)
 - [Step 1: Identify the PR and branch](#step-1-identify-the-pr-and-branch)
 - [Step 2: Fetch unresolved review threads](#step-2-fetch-unresolved-review-threads)
 - [Step 3: Fetch suppressed comments](#step-3-fetch-suppressed-comments)
@@ -73,6 +74,7 @@ These rules are mandatory:
 
 ## Workflow
 
+0. [Apply project overrides](#step-0-apply-project-overrides)
 1. [Identify the PR and branch](#step-1-identify-the-pr-and-branch)
 2. [Fetch unresolved review threads](#step-2-fetch-unresolved-review-threads)
 3. [Fetch suppressed comments](#step-3-fetch-suppressed-comments)
@@ -83,6 +85,24 @@ These rules are mandatory:
 7. [Force-push the branch](#step-7-force-push-the-branch)
 8. [Reply to and resolve threads](#step-8-reply-to-and-resolve-threads)
 9. [Request another Copilot review](#step-9-request-another-copilot-review)
+
+## Step 0: Apply project overrides
+
+A project may carry its own thin copy of this workflow holding only its local
+changes and additions — extra protected branches, the project's test command,
+links to related project skills. Check for one at each of these paths and use
+the first that exists:
+
+- `.claude/skills/resolve-pr-feedback/SKILL.md`
+- `.github/skills/resolve-pr-feedback/SKILL.md`
+- `.github/skills/resolve-feedback/SKILL.md`
+
+If one exists, read it and apply its changes and additions throughout the
+workflow. Where it conflicts with this skill, the project file wins. If that
+file is what invoked this skill, its changes are already in context — do not
+re-read it, and do not re-invoke anything it names.
+
+If none exists, run this skill as written.
 
 ## Step 1: Identify the PR and branch
 
