@@ -1,6 +1,6 @@
 {
   "name": "jcouball-writing",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Writing and explanation tools. Strips AI tells from prose while keeping reference docs dry, and explains technical subjects in plain language without dropping the real terms.",
   "author": {
     "name": "James Couball"
