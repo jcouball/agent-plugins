@@ -63,13 +63,13 @@ Code.
 | Component | Name | What it does |
 | --- | --- | --- |
 | Skill | `unslop` | Removes AI writing tells from prose. Voice rules are tiered by surface, so PR descriptions get personality and YARD reference docs stay dry. |
-| Command | `/eli5 <topic>` | Explains a concept, file, or error in plain language without paraphrasing the real technical terms. |
+| Command | `/eli5 [topic]` | Explains a concept, file, or error in plain language without paraphrasing the real technical terms. |
 
 ### jcouball-github
 
 | Component | Name | What it does |
 | --- | --- | --- |
-| Skill | `resolve-pr-feedback` | Works through unresolved PR review threads and the Copilot comments GitHub suppresses for low confidence, folds each fix into the commit that last touched the same file, and asks Copilot to look again. |
+| Skill | `address-pr-feedback` | Works through unresolved PR review threads and the Copilot comments GitHub suppresses for low confidence, folds each fix into the commit that last touched the same file, and asks Copilot to look again. |
 | Skill | `rebase` | Rebases the current branch onto the default branch, walks through any conflicts, and force-pushes with lease. Every Git command runs without opening an editor. |
 
 ### jcouball-marketplace
