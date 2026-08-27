@@ -78,6 +78,9 @@ Code.
 | --- | --- | --- |
 | Command | `/promote-skill` | Moves a full project skill into this marketplace, generalizes it, and leaves a thin project-local override file behind. |
 | Command | `/add-overrides` | Creates a project-local override file for a skill that lives in this marketplace, holding only the project's changes and additions. |
+| Command | `/add-skill` | Adds a new skill to a plugin here: frontmatter, manifest declaration, trigger-worded description, and the project-overrides contract. |
+| Command | `/vendor-skill` | Vendors a third-party skill in two commits — upstream byte for byte, then local modifications — with provenance in NOTICE.md. |
+| Command | `/update-vendored-skill` | Ports upstream changes into a vendored skill by hand, diffing the two upstream versions and updating NOTICE.md. |
 
 ## Using these outside Claude Code
 

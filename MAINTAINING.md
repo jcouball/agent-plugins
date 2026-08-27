@@ -166,27 +166,14 @@ CI runs the same checks in two jobs, `Lint and Validate` and
 
 ## Adding a skill
 
-1. Create `plugins/<plugin>/skills/<name>/SKILL.md` with `name` and
-   `description` frontmatter. The `name` has to match the directory.
-2. Add `"./skills/<name>"` to the `skills` array in the plugin manifest.
-   `npm run lint:manifests` fails if a skill exists on disk but is not
-   declared.
-3. Write the description to name its triggers. Claude Code routes on the
-   description alone, so a description without trigger words means the skill
-   never fires on its own.
-4. Give the skill the project-overrides contract that every skill here
-   carries: a first workflow step that checks
-   `.claude/skills/<name>/SKILL.md` and then
-   `.github/skills/<name>/SKILL.md`, falls back to a `SKILL.md` with the
-   same frontmatter name anywhere else the project keeps agent skills
-   (never a vendored copy of the skill itself), applies the changes and
-   additions from the first file found with the project file winning on
-   conflict, and refuses to re-read or re-invoke the file that invoked it.
-   Copy the wording from the resolve-pr-feedback skill's Step 0, but list
-   only the two paths above with the new skill's name — the extra alias
-   path there is specific to that skill's history — and end the description
-   with its sentence pointing at that step. Commands do not carry the
-   contract; it is for skills only.
+Run `/jcouball-marketplace:add-skill` with the plugin and skill name;
+[its command file](plugins/marketplace/commands/add-skill.md) is the
+canonical procedure, paste-able by an agent without the plugin installed.
+It covers the frontmatter, the manifest declaration that
+`npm run lint:manifests` enforces, a trigger-worded description — Claude
+Code routes on the description alone — and the project-overrides contract
+that every skill here carries. Commands do not carry the contract; it is
+for skills only.
 
 The contract is what lets a project adapt a skill by dropping in a thin file
 of deltas instead of forking the skill — the plugin holds the one full copy,
@@ -235,48 +222,31 @@ Delete those directories by hand if they accumulate.
 
 ## Vendoring a third-party skill
 
-Land it in two commits, always.
+Land it in two commits, always: first the upstream file byte for byte, then
+every local modification with the reasoning in the commit body.
+`/jcouball-marketplace:vendor-skill` walks the procedure, license check
+included; [its command file](plugins/marketplace/commands/vendor-skill.md)
+is the canonical copy of the steps.
 
-1. The upstream file, byte for byte, with no local changes. Record the source
-   repository, path, and commit in `NOTICE.md`.
-2. Every local modification, with the reasoning in the commit body.
-
-`git diff <vendor-commit> <modify-commit>` then answers what was changed
-locally. A prose file recording the same thing drifts the first time someone
-edits the skill and forgets to update it — which is why `NOTICE.md` records
-only the source and the upstream commit, and describes the local changes not
-at all. The git history is the record of those.
-
-Check the upstream license before vendoring, and carry its notice in `NOTICE.md`.
-
-Local modifications may include formatting: a vendored file is linted like any
-other, so rewrapping for line length or renumbering for stable IDs is fine, as
-long as it lands in its own commit with no wording changes mixed in.
+The two commits are the point, not a formality:
+`git diff <vendor-commit> <modify-commit>` answers what was changed locally.
+A prose file recording the same thing drifts the first time someone edits
+the skill and forgets to update it — which is why `NOTICE.md` records only
+the source repository, path, upstream commit, and license notice, and
+describes the local changes not at all. The git history is the record of
+those.
 
 ### Updating a vendored skill
 
 The local copy drifts from upstream on purpose — reformatting, dropped
 sections, local fixes — so an upstream update is ported by hand, not merged.
 `NOTICE.md` records the upstream commit last reviewed.
-
-1. Fetch the file at the recorded commit and at the new upstream head:
-
-   ```bash
-   gh api 'repos/<owner>/<repo>/contents/<path>?ref=<sha>' --jq .content | base64 -d
-   ```
-
-2. Diff the two upstream versions. Local changes never appear in that diff, so
-   it shows exactly what upstream changed and nothing else.
-3. Port the hunks worth taking into the local file, applying this repository's
-   formatting as you go. `git merge-file <local> <old> <new>` auto-applies
-   hunks in regions with no local changes and leaves conflict markers where
-   they collide.
-4. Run `npm run ci`.
-5. Update the commit recorded in `NOTICE.md`.
-6. Commit once, scoped to the plugin, naming the upstream range in the body.
-   Use `feat` or `fix`, not `chore`: a `chore` never triggers a release, and
-   content on `main` without a version bump leaves installs pinned to the old
-   commit (see the `npm run sync` gotcha below).
+`/jcouball-marketplace:update-vendored-skill` walks the port: fetch both
+upstream versions, diff them so local changes never appear, take the hunks
+worth taking, update `NOTICE.md`, and commit as `feat` or `fix` — never
+`chore`, which would strand installs on the old commit.
+[Its command file](plugins/marketplace/commands/update-vendored-skill.md)
+is the canonical copy of the steps.
 
 ## Command line gotchas
 
