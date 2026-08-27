@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.0](https://github.com/jcouball/agent-plugins/compare/github-v2.0.0...github-v2.1.0) (2026-08-27)
+
+
+### Features
+
+* **github:** Fall back to a same-named skill file in override lookup ([00bf138](https://github.com/jcouball/agent-plugins/commit/00bf13848f8b8924959c742b9a7af0dc4d4cd716))
+* **github:** Read project-local overrides in rebase ([3213795](https://github.com/jcouball/agent-plugins/commit/3213795d5690f6d37f61f9af84f7bf059f1e0542))
+
 ## [2.0.0](https://github.com/jcouball/agent-plugins/compare/github-v1.1.1...github-v2.0.0) (2026-08-27)
 
 
