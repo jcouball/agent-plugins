@@ -5,7 +5,7 @@ any agent working in this repository.
 
 ## Layout
 
-```
+```text
 .claude-plugin/marketplace.json     the marketplace, lists every plugin below
 .commitlintrc.yml                   the commit message rules
 .release-please-config.json         one entry per plugin, versioned independently

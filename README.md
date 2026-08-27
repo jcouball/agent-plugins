@@ -8,7 +8,7 @@ This repository is for the skills that follow me between repositories instead.
 
 ## Install
 
-```
+```text
 /plugin marketplace add jcouball/agent-plugins
 /plugin install jcouball-writing@jcouball
 /plugin install jcouball-github@jcouball
