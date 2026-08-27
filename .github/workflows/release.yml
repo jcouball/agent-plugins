@@ -7,6 +7,13 @@ name: Release
 #
 # There is nothing to publish. The marketplace serves the default branch
 # directly, so a release here is a tagged commit and nothing more.
+#
+# Each plugin has its own config and manifest pair under .release-please/,
+# and this workflow runs release-please once per plugin. With one shared
+# manifest, every release pull request edited the same file, so merging one
+# left the others in conflict — and release-please does not rebase a pull
+# request whose content it considers unchanged. Split per plugin, the pull
+# requests touch disjoint files and merging one leaves the rest mergeable.
 
 on:
   push:
@@ -15,15 +22,47 @@ on:
   workflow_dispatch:
 
 jobs:
+  plugins:
+    name: List plugins
+
+    runs-on: ubuntu-latest
+
+    outputs:
+      plugins: ${{ steps.list.outputs.plugins }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # The matrix comes from the directories under plugins/, not from a list
+      # kept here, so adding a plugin cannot silently miss the release
+      # workflow. A plugin directory without its .release-please/ pair fails
+      # the release job loudly, and lint:manifests catches it before that.
+      - name: List plugin directories
+        id: list
+        run: |
+          plugins=$(find plugins -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort | jq -R -s -c 'split("\n")[:-1]')
+          echo "plugins=$plugins" >> "$GITHUB_OUTPUT"
+
   release:
+    name: Release ${{ matrix.plugin }}
+
+    needs: plugins
+
     runs-on: ubuntu-latest
 
     permissions:
       contents: write
       pull-requests: write
 
+    strategy:
+      # One plugin's failure says nothing about the others.
+      fail-fast: false
+      matrix:
+        plugin: ${{ fromJSON(needs.plugins.outputs.plugins) }}
+
     steps:
-      - name: Create release pull requests and releases
+      - name: Create release pull request and release
         uses: googleapis/release-please-action@v5
         with:
           # A pull request opened by GITHUB_TOKEN does not start other
@@ -32,5 +71,5 @@ jobs:
           # pull-requests write. The fallback keeps this workflow working
           # before that secret exists.
           token: ${{ secrets.AUTO_RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
-          config-file: .release-please-config.json
-          manifest-file: .release-please-manifest.json
+          config-file: .release-please/${{ matrix.plugin }}-config.json
+          manifest-file: .release-please/${{ matrix.plugin }}-manifest.json
