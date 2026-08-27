@@ -8,14 +8,14 @@ in it, or under `.claude/skills/`, which Claude Code alone reads. This
 repository is for the skills that follow me between repositories instead.
 
 What makes these skills different is that every one honors project-local
-overrides without being forked. A skill's first step checks the consuming
-project for a thin file of the same name — `.claude/skills/<name>/SKILL.md`,
-then `.github/skills/<name>/SKILL.md`, then a same-named `SKILL.md` anywhere
-else the project keeps agent skills, using the first that exists — holding
-only that project's changes and additions, and applies them on top, with the
-project file winning where they conflict. A vendored copy of the skill
-itself never counts as an override. A project adapts a skill by
-dropping in a delta file, never by maintaining a forked full copy.
+overrides without being forked. A skill's first step looks for a thin
+override file in the consuming project — `.claude/skills/<name>/SKILL.md`,
+then `.github/skills/<name>/SKILL.md`, then any `SKILL.md` whose frontmatter
+`name` matches the skill, wherever the project keeps agent skills — and
+applies the first one it finds on top, with the project file winning where
+they conflict. The override holds only that project's changes and additions;
+a vendored copy of the skill itself never counts as one. A project adapts a
+skill by dropping in a delta file, never by maintaining a forked full copy.
 The `jcouball-marketplace` plugin ships commands for setting that up.
 
 ## Install
