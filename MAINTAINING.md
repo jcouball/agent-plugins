@@ -174,6 +174,31 @@ CI runs the same checks in two jobs, `Lint and Validate` and
 3. Write the description to name its triggers. Claude Code routes on the
    description alone, so a description without trigger words means the skill
    never fires on its own.
+4. Give the skill the project-overrides contract that every skill here
+   carries: a first workflow step that checks
+   `.claude/skills/<name>/SKILL.md` and then
+   `.github/skills/<name>/SKILL.md`, falls back to a `SKILL.md` with the
+   same frontmatter name anywhere else the project keeps agent skills
+   (never a vendored copy of the skill itself), applies the changes and
+   additions from the first file found with the project file winning on
+   conflict, and refuses to re-read or re-invoke the file that invoked it.
+   Copy the wording from the resolve-pr-feedback skill's Step 0, but list
+   only the two paths above with the new skill's name — the extra alias
+   path there is specific to that skill's history — and end the description
+   with its sentence pointing at that step. Commands do not carry the
+   contract; it is for skills only.
+
+The contract is what lets a project adapt a skill by dropping in a thin file
+of deltas instead of forking the skill — the plugin holds the one full copy,
+the project keeps only its differences. The jcouball-marketplace plugin
+ships both directions of that move as commands, run from a Claude Code
+session in the project repository: `/jcouball-marketplace:promote-skill`
+when the full skill lives in the project and should become the plugin's
+canonical copy, and `/jcouball-marketplace:add-overrides` when the skill
+already lives here and the project only needs its delta file. The command
+files under [plugins/marketplace/commands/](plugins/marketplace/commands/)
+are plain markdown prompts, so an agent without the plugin installed can
+paste them from the repository instead.
 
 ## Adding a command
 
