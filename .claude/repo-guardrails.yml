@@ -1,0 +1,23 @@
+# Guardrails baseline for this repository.
+#
+# Read by the /jcouball-github:check-repo-config command. Patterns use
+# GitHub ruleset fnmatch syntax: * stays within one path segment, and a
+# terminal ** does too; write **/* to cross / (release/**/* matches
+# release/1.0 and release/2026/1.0).
+protected_branches:
+  - main
+
+merge_methods:
+  merge: false
+  squash: false
+  rebase: true
+
+repository:
+  delete_branch_on_merge: true
+  allow_auto_merge: false
+
+branch_rules:
+  - pull_request
+  - non_fast_forward
+  - deletion
+  - required_linear_history

@@ -72,6 +72,7 @@ Code.
 | Skill | `address-pr-feedback` | Works through unresolved PR review threads and the Copilot comments GitHub suppresses for low confidence, folds each fix into the commit that last touched the same file, and asks Copilot to look again. |
 | Skill | `address-pr-feedback-iteratively` | Runs `address-pr-feedback` in a loop — address the feedback, wait for the requested Copilot review to come back, repeat — until a review arrives with nothing left to address or an iteration cap is reached. |
 | Skill | `rebase` | Rebases the current branch onto the default branch, walks through any conflicts, and force-pushes with lease. Every Git command runs without opening an editor. |
+| Command | `/jcouball-github:check-repo-config [--fix]` | Audits the repository's branch rules, merge methods, settings, and agent guidance against `.claude/repo-guardrails.yml` (or built-in defaults) and, with `--fix`, applies the drift it has permission to fix. |
 
 ### jcouball-marketplace
 
