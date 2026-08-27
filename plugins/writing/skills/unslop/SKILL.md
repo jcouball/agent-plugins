@@ -1,6 +1,6 @@
 ---
 name: unslop
-description: 'Removes AI writing tells from prose and rewrites it in plain, direct language. Use when writing or editing documentation, README and CHANGELOG entries, PR descriptions, commit message bodies, code comments, or any prose that reads as machine-generated.'
+description: 'Removes AI writing tells from prose and rewrites it in plain, direct language. Use when writing or editing documentation, README and CHANGELOG entries, PR descriptions, commit message bodies, code comments, or any prose that reads as machine-generated. If the current project has its own unslop skill, that file holds project-specific changes and additions: still apply this skill, and apply those changes on top (Process step 0).'
 ---
 
 # Unslop
@@ -9,6 +9,14 @@ Edit text to remove AI patterns and add human voice.
 
 ## Process
 
+0. Apply project overrides. Check `.claude/skills/unslop/SKILL.md`, then
+   `.github/skills/unslop/SKILL.md`, then any other project `SKILL.md`
+   whose frontmatter name is `unslop` — never a vendored copy of this skill
+   itself — and use the first that exists: read it and apply its changes
+   and additions — extra patterns, exempted phrases, project voice rules —
+   with the project file winning on conflict. If that file is what invoked
+   this skill, its changes are already in context; do not re-read it, and
+   do not re-invoke anything it names.
 1. Identify the voice level for what is being edited (see next section).
 2. Scan for the patterns below. They apply at every voice level.
 3. Rewrite. Preserve meaning, match intended tone.
