@@ -87,6 +87,14 @@ again in CI. The type is not decoration. `feat` is a minor bump, `fix` is a
 patch, and either a `!` after the type or a `BREAKING CHANGE:` footer is a
 major. Scope the commit to the plugin, skill, or command it touches.
 
+One commit, one plugin. release-please attributes a commit to a plugin by the
+paths it touches, not by its scope, and it honors a breaking marker on every
+plugin the commit reaches. A `feat(github)!` that also updates references in
+the marketplace commands therefore proposes a major bump for the marketplace
+plugin too — which is how marketplace v2.0.0 shipped a changelog describing a
+github rename. When a change spans plugin directories, split it into one
+commit per plugin so the type and the `!` land only where they apply.
+
 ## Releasing a change
 
 No one edits a version by hand. release-please watches `main` and keeps one
