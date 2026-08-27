@@ -28,7 +28,7 @@
     },
     {
       "name": "jcouball-marketplace",
-      "description": "Commands for maintaining the jcouball marketplace itself: promote a full project skill into the marketplace, or add a thin project-local override file for a skill that already lives there.",
+      "description": "Commands for maintaining the jcouball marketplace: promote a project skill into it, add a project-local override file, scaffold a new skill with the overrides contract, and vendor or update third-party skills.",
       "author": {
         "name": "James Couball"
       },
