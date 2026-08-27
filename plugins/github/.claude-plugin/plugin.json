@@ -17,7 +17,7 @@
     "rebase"
   ],
   "skills": [
-    "./skills/resolve-feedback",
+    "./skills/resolve-pr-feedback",
     "./skills/rebase"
   ]
 }

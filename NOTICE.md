@@ -14,28 +14,10 @@ Derived from the "unslop" skill in poteto's pstack plugin. MIT licensed.
     path:   pstack/skills/unslop/SKILL.md
     commit: 195d9359bdc2890f83745df69927528ad4538406
 
-## plugins/github/skills/resolve-feedback
-
-Derived from the "resolve-feedback" skill in the ruby-git project. MIT
-licensed.
-
-    repo:   https://github.com/ruby-git/ruby-git
-    path:   .github/skills/resolve-feedback/SKILL.md
-    commit: 9677f33103f926271be5da8f4406f532f47b3ef3
-
-## plugins/github/skills/rebase
-
-Derived from the "rebase" skill in the ruby-git project. MIT licensed.
-
-    repo:   https://github.com/ruby-git/ruby-git
-    path:   .github/skills/rebase/SKILL.md
-    commit: 01b8680bd11300db0943801d45ddbac07d710c97
-
 ## License
 
 The vendored work above is used under the MIT License. Copyright (c) 2026
-Lauren Tan (unslop); Copyright (c) 2008 Scott Chacon (resolve-feedback,
-rebase).
+Lauren Tan (unslop).
 
     Permission is hereby granted, free of charge, to any person obtaining a
     copy of this software and associated documentation files (the

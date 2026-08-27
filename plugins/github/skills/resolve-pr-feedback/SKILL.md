@@ -1,9 +1,9 @@
 ---
-name: resolve-feedback
+name: resolve-pr-feedback
 description: 'Resolves unresolved pull request review threads and suppressed (low-confidence) Copilot review comments on the current branch, folds each fix into the existing commit that last touched the same file, force-pushes with lease, and requests a fresh Copilot review. Use when addressing PR feedback, resolving review comments or threads, handling comments suppressed due to low confidence, amending fixes into prior commits, or asking Copilot to re-review after changes. If the current project has its own resolve-feedback skill, use the project''s version instead of this one.'
 ---
 
-# Resolve Feedback
+# Resolve PR Feedback
 
 Address the unresolved review threads and suppressed comments on the pull
 request for the current branch, folding each fix into the existing commit that
