@@ -102,7 +102,13 @@ workflow. Where it conflicts with this skill, the project file wins. If that
 file is what invoked this skill, its changes are already in context — do not
 re-read it, and do not re-invoke anything it names.
 
-If none exists, run this skill as written.
+If none of those paths exists, fall back to searching the project for a
+`SKILL.md` whose frontmatter `name` is `resolve-pr-feedback` wherever the
+project keeps agent skills, and treat it the same way. Never treat a vendored
+or installed copy of this skill itself as the override — a full copy of the
+workflow holds no project deltas.
+
+If no override exists, run this skill as written.
 
 ## Step 1: Identify the PR and branch
 
