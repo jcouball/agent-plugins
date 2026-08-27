@@ -59,7 +59,6 @@ const frontmatter = (relative) => {
 }
 
 const marketplace = readJson('.claude-plugin/marketplace.json')
-const versions = readJson('.release-please-manifest.json')
 const pluginDirectories = directoriesIn('plugins')
 
 if (pluginDirectories.length === 0) fail('no plugins found under plugins/')
@@ -121,16 +120,38 @@ for (const plugin of pluginDirectories) {
     }
   }
 
-  // release-please owns the version. If the two disagree, the release PR
-  // updated one file and not the other.
+  // Each plugin has its own release-please config and manifest pair, so the
+  // release pull requests share no files and merging one cannot conflict
+  // with another. The pair has to exist, the config has to describe this
+  // plugin's directory and no other — a second package entry would put two
+  // plugins back in one release PR — and the tracked version has to agree
+  // with plugin.json: release-please owns the version, so a disagreement
+  // means the release PR updated one file and not the other.
+  const releaseConfig = readJson(`.release-please/${plugin}-config.json`)
+  if (releaseConfig) {
+    const packages = Object.keys(releaseConfig.packages ?? {})
+    if (!packages.includes(`plugins/${plugin}`)) {
+      fail(`.release-please/${plugin}-config.json does not declare plugins/${plugin} under packages`)
+    }
+    const extras = packages.filter((path) => path !== `plugins/${plugin}`)
+    if (extras.length > 0) {
+      fail(
+        `.release-please/${plugin}-config.json declares packages beyond ` +
+          `plugins/${plugin}: ${extras.join(', ')}`
+      )
+    }
+  }
+
+  const releaseManifestPath = `.release-please/${plugin}-manifest.json`
+  const versions = readJson(releaseManifestPath)
   if (versions) {
     const tracked = versions[`plugins/${plugin}`]
     if (tracked === undefined) {
-      fail(`plugins/${plugin} is not tracked in .release-please-manifest.json`)
+      fail(`plugins/${plugin} is not tracked in ${releaseManifestPath}`)
     } else if (tracked !== manifest.version) {
       fail(
         `version mismatch for ${manifest.name}: ` +
-          `plugin.json says ${manifest.version}, .release-please-manifest.json says ${tracked}`
+          `plugin.json says ${manifest.version}, ${releaseManifestPath} says ${tracked}`
       )
     }
   }

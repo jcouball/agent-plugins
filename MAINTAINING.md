@@ -8,8 +8,9 @@ any agent working in this repository.
 ```text
 .claude-plugin/marketplace.json     the marketplace, lists every plugin below
 .commitlintrc.yml                   the commit message rules
-.release-please-config.json         one entry per plugin, versioned independently
-.release-please-manifest.json       the current version of every plugin
+.release-please/
+  <plugin>-config.json              how release-please releases the plugin
+  <plugin>-manifest.json            the plugin's current version
 .husky/                             git hooks, installed by npm install
 plugins/<plugin>/
   .claude-plugin/plugin.json        the plugin manifest, declares its skills
@@ -93,6 +94,15 @@ open release pull request per plugin. Merging that pull request bumps the
 version in the plugin manifest, writes the plugin `CHANGELOG.md`, tags the
 commit, and cuts a GitHub release.
 
+Each plugin has its own config and manifest pair under `.release-please/`,
+and the release workflow runs release-please once per pair. This is what
+keeps the release pull requests independent: they touch disjoint files, so
+merging one leaves the others mergeable. With one shared manifest, every
+release pull request edited the same five-line file, and merging one left
+the rest in conflict — release-please does not rebase a pull request whose
+content it considers unchanged, so each conflicted pull request had to be
+closed and regenerated.
+
 There is nothing to publish. The marketplace serves the default branch
 directly, so a release is a tagged commit and nothing more. The tag exists so
 release-please knows where the last one ended.
@@ -116,10 +126,11 @@ Code.
 ### How release-please finds the starting point
 
 release-please looks for a tag named `<component>-v<version>`, taking the
-version from `.release-please-manifest.json`, and considers only the commits
-that touched the plugin's directory since that tag. With no tag it reads the
-whole history, which on a repository that predates release-please means
-proposing versions built from commits that already shipped.
+version from the plugin's manifest in `.release-please/`, and considers only
+the commits that touched the plugin's directory since that tag. With no tag
+it reads the whole history, which on a repository that predates
+release-please means proposing versions built from commits that already
+shipped.
 
 Both plugins were tagged once to give it a floor. This is done and does not
 need repeating:
@@ -147,7 +158,8 @@ Five checks, each runnable on its own:
 - `npm run lint:manifests` compares the marketplace manifest, the plugin
   manifests, and the skills on disk against each other, and fails when a skill
   is undeclared, a plugin is unlisted, a `SKILL.md` has no description, or
-  `plugin.json` and `.release-please-manifest.json` disagree about a version.
+  `plugin.json` and the plugin's `.release-please/` manifest disagree about a
+  version.
 - `npm run lint:links` resolves every relative markdown link. External URLs are
   left alone, since the links that rot here are the ones naming files in this
   repository.
@@ -199,10 +211,12 @@ an error.
 1. Create `plugins/<name>/.claude-plugin/plugin.json`.
 2. Add an entry to the `plugins` array in the marketplace manifest with
    `"source": "./plugins/<name>"`.
-3. Add the plugin to `.release-please-config.json` and seed its starting
-   version in `.release-please-manifest.json`. The manifest check fails while
-   either is missing. Whether that seeded version ships as it stands depends on
-   whether you tag it, which
+3. Create `.release-please/<name>-config.json` and seed its starting version
+   in `.release-please/<name>-manifest.json`. Copy an existing pair and
+   change the plugin name throughout. The manifest check fails while either
+   is missing. The release workflow builds its matrix from the directories
+   under `plugins/`, so there is no list to update there. Whether that
+   seeded version ships as it stands depends on whether you tag it, which
    [How release-please finds the starting point](#how-release-please-finds-the-starting-point)
    explains.
 4. Install it: `claude plugin install <plugin-name>@jcouball`.
@@ -274,6 +288,6 @@ These cost real time to rediscover.
   `AUTO_RELEASE_TOKEN`, a personal access token with contents and
   pull-requests write, and falls back to `GITHUB_TOKEN` when that secret is
   missing.
-- In `.release-please-config.json`, a relative `extra-files` path resolves
+- In a release-please config, a relative `extra-files` path resolves
   against the package directory, not the repository root. A leading `/` makes
   it repository-relative.
