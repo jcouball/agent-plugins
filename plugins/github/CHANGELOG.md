@@ -1,5 +1,13 @@
 # Changelog
 
+## [3.1.0](https://github.com/jcouball/agent-plugins/compare/github-v3.0.0...github-v3.1.0) (2026-08-30)
+
+
+### Features
+
+* **github:** Add the address-pr-feedback-iteratively skill ([074e4fb](https://github.com/jcouball/agent-plugins/commit/074e4fbb96195a181a98b9c049255d163b68209d))
+* **github:** Audit repo config and agent guidance against a baseline ([dc418a0](https://github.com/jcouball/agent-plugins/commit/dc418a034089b1afee6a1bc407b630602e70543b))
+
 ## [3.0.0](https://github.com/jcouball/agent-plugins/compare/github-v2.1.0...github-v3.0.0) (2026-08-27)
 
 
