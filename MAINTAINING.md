@@ -17,6 +17,7 @@ plugins/<plugin>/
   skills/<skill>/SKILL.md           one directory per skill
   commands/<command>.md             one file per slash command
 scripts/                            the checks and the local install helper
+metrics/<report>/                   a report, its data, the script that makes it
 ```
 
 The path names the plugin, the `name` field in `plugin.json` keeps it unique
