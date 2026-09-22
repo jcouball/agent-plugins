@@ -25,6 +25,7 @@ The `jcouball-marketplace` plugin ships commands for setting that up.
 /plugin install jcouball-writing@jcouball
 /plugin install jcouball-github@jcouball
 /plugin install jcouball-marketplace@jcouball
+/plugin install jcouball-testing@jcouball
 ```
 
 Run these once per machine. They are Claude Code slash commands. The VS Code
@@ -36,6 +37,7 @@ claude plugin marketplace add jcouball/agent-plugins
 claude plugin install jcouball-writing@jcouball
 claude plugin install jcouball-github@jcouball
 claude plugin install jcouball-marketplace@jcouball
+claude plugin install jcouball-testing@jcouball
 ```
 
 ## Update
@@ -45,6 +47,7 @@ claude plugin marketplace update jcouball
 claude plugin update jcouball-writing@jcouball
 claude plugin update jcouball-github@jcouball
 claude plugin update jcouball-marketplace@jcouball
+claude plugin update jcouball-testing@jcouball
 ```
 
 Refresh the marketplace first. Without it, `update` reads a stale cache and
@@ -73,6 +76,12 @@ Code.
 | Skill | `address-pr-feedback-iteratively` | Runs `address-pr-feedback` in a loop — address the feedback, wait for the requested Copilot review to come back, repeat — until a review arrives with nothing left to address or an iteration cap is reached. |
 | Skill | `rebase` | Rebases the current branch onto the default branch, walks through any conflicts, and force-pushes with lease. Every Git command runs without opening an editor. |
 | Command | `/jcouball-github:check-repo-config [--fix]` | Audits the repository's branch rules, merge methods, settings, and agent guidance against `.claude/repo-guardrails.yml` (or built-in defaults) and, with `--fix`, applies the drift it has permission to fix. |
+
+### jcouball-testing
+
+| Component | Name | What it does |
+| --- | --- | --- |
+| Skill | `testing-guide` | Points at the plugin's [testing guide](plugins/testing/docs/testing-guide.md), which defines the vocabulary for talking about tests, classifies them on six dimensions, and says which kind to write, with sections mapping it to Ruby, RSpec, and Rails. Loaded when asked why a testing rule exists or what a term means, not for ordinary test writing. |
 
 ### jcouball-marketplace
 
