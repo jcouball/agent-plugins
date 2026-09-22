@@ -150,11 +150,16 @@ git tag github-v1.0.0 e5d49b9
 git push --tags
 ```
 
-A new plugin needs a tag only if its seeded version should ship as it stands.
-Without one, the commits that created the plugin all count toward its next
-release, so a `feat` among them bumps the seeded version before it has shipped
-at all. Tag the creating commit to release that version unchanged, or leave it
-untagged and let the first release pull request bump past it.
+The manifest version counts only when that tag exists. With no tag,
+release-please treats the plugin as never released, ignores the manifest and
+the commit types both, and proposes `initial-version` from the plugin's
+config, which defaults to `1.0.0`. The testing plugin found this out: seeded
+at 0.0.0 and untagged, its first release pull request proposed 1.0.0.
+
+So a new plugin has two choices. Tag the creating commit with the seeded
+version to release it as it stands, or set `initial-version` in the config
+to the first version that should ship and leave the plugin untagged. Seeding
+the manifest without doing either gets 1.0.0.
 
 ## Running the checks
 
@@ -224,8 +229,9 @@ an error.
    in `.release-please/<name>-manifest.json`. Copy an existing pair and
    change the plugin name throughout. The manifest check fails while either
    is missing. The release workflow builds its matrix from the directories
-   under `plugins/`, so there is no list to update there. Whether that
-   seeded version ships as it stands depends on whether you tag it, which
+   under `plugins/`, so there is no list to update there. Either tag the
+   creating commit with the seeded version or set `initial-version` in the
+   config; without one of those the first release is 1.0.0, as
    [How release-please finds the starting point](#how-release-please-finds-the-starting-point)
    explains.
 4. Install it: `claude plugin install <plugin-name>@jcouball`.
