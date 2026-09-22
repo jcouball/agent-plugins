@@ -1,0 +1,21 @@
+{
+  "name": "jcouball-testing",
+  "version": "0.0.0",
+  "description": "Testing vocabulary and standards. A guide that defines the terms for talking about tests, classifies them on six dimensions, and says how to choose which kind to write, with sections mapping it to Ruby, RSpec, and Rails.",
+  "author": {
+    "name": "James Couball"
+  },
+  "homepage": "https://github.com/jcouball/agent-plugins",
+  "repository": "https://github.com/jcouball/agent-plugins",
+  "license": "MIT",
+  "keywords": [
+    "testing",
+    "rspec",
+    "unit-tests",
+    "integration-tests",
+    "test-doubles"
+  ],
+  "skills": [
+    "./skills/testing-guide"
+  ]
+}
