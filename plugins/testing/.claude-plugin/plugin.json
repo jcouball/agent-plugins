@@ -1,7 +1,7 @@
 {
   "name": "jcouball-testing",
   "version": "0.1.0",
-  "description": "Testing vocabulary and standards. A guide that defines the terms for talking about tests, classifies them on six dimensions, and says how to choose which kind to write, with sections mapping it to Ruby, RSpec, and Rails.",
+  "description": "Testing vocabulary and standards. A guide that defines the terms for talking about tests and how to choose which kind to write, the RSpec base standards every spec follows with the unit and integration standards built on them, and test debugging and TDD refactor step skills, each citing the guide for the reasoning.",
   "author": {
     "name": "James Couball"
   },
@@ -16,6 +16,11 @@
     "test-doubles"
   ],
   "skills": [
-    "./skills/testing-guide"
+    "./skills/testing-guide",
+    "./skills/rspec-base-standards",
+    "./skills/rspec-unit-testing-standards",
+    "./skills/rspec-integration-testing-standards",
+    "./skills/test-debugging",
+    "./skills/tdd-refactor-step"
   ]
 }
