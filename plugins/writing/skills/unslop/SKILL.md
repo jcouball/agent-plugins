@@ -18,10 +18,11 @@ Edit text to remove AI patterns and add human voice.
    this skill, its changes are already in context; do not re-read it, and
    do not re-invoke anything it names.
 1. Identify the voice level for what is being edited (see next section).
-2. Scan for the patterns below. They apply at every voice level.
+2. Scan for the patterns below. They apply at every voice level. A rule that
+   varies by level says so.
 3. Rewrite. Preserve meaning, match intended tone.
-4. Be specific. Not "this is concerning" but "there's something unsettling
-   about agents churning away at 3am". Vague writing reads as generated at
+4. Be specific. Not "this is concerning" but "the job runs unattended at 3am
+   and nothing checks its exit code". Vague writing reads as generated at
    every voice level, including reference.
 5. Apply the voice level.
 6. Self-audit: "What makes this obviously AI generated?" Fix remaining tells.
@@ -58,7 +59,9 @@ Restrained voice. The reader needs to understand a decision, not meet the author
 
 - Have opinions about tradeoffs. "Slower, but it survives a locale change"
   beats listing both options neutrally.
-- Vary rhythm. Short sentences. Then longer ones that take their time.
+- Vary rhythm. Mix short sentences with longer ones that develop a point.
+  A fragment used for rhythm is voice here if it carries the meaning (7.6)
+  and the reader parses it without effort (7.7).
 - Acknowledge complexity. Say when something is genuinely awkward, and why.
 - Still third person. No "I", no conversational asides, no deliberate mess.
 
@@ -68,7 +71,9 @@ Full voice. The reader is a person who may reply.
 
 - Everything in Explanatory, plus the following.
 - Use "I" when it fits. First person is not unprofessional.
-- Let some mess in. Perfect structure looks machine made.
+- Let some mess in. Perfect structure looks machine made. Mess means rhythm
+  and asides, which 7.6 judges at this level, not dropped articles or
+  symbol-speak, which 7.7 covers everywhere.
 
 ## Patterns to detect and fix
 
@@ -113,16 +118,15 @@ scale. List topics directly.
 ### 3. Style
 
 **3.1 Em dash overuse.** Avoid em dashes entirely. Use periods or commas only
-(no parentheses, no en dashes, no hyphen-as-dash substitutes). Em dashes are
-an AI tell, and reaching for parentheses instead just trades one tell for
-another. If a thought needs separation, end the sentence or use a comma.
+(no parentheses, no en dashes, no hyphen-as-dash substitutes). If a thought
+needs separation, end the sentence or use a comma.
 
 **3.2 Colon overuse.** Colons are fine before a list or example. Not as
 mid-sentence connectors. "If you're coming from traditional automation:
 instead of registering event handlers, you describe conditions" adds nothing
-with the colon. Rewrite to let the point stand on its own without comparison
-framing. "Describing when the scheduler should fire works best as plain
-English." Same meaning, no crutch punctuation.
+with the colon. Rewrite so the point needs no comparison framing.
+"Describing when the scheduler should fire works best as plain English." Same
+meaning, without the colon.
 
 **3.3 Boldface overuse.** Don't bold every proper noun or acronym. Unbold
 everything except the few terms a reader skimming the page must find.
@@ -159,7 +163,8 @@ becomes "Because". "It is important to note that" gets deleted.
 
 **5.2 Excessive hedging.** "could potentially possibly be argued that it
 might" becomes "may". One hedge is enough when uncertainty is real; none when
-it is not. Do not strip a hedge that marks genuine doubt.
+it is not. Do not strip a hedge that marks genuine doubt. At Reference, state
+that doubt as a condition or a named limit instead of hedging the sentence.
 
 **5.3 Generic conclusions.** "The future looks bright." State specific plans
 or facts, or end without a conclusion. A summary that restates the section is
@@ -200,8 +205,32 @@ matter.
 
 **7.4 Cut adverbs, or use a stronger verb.** "runs quickly" becomes "is fast"
 or the number. "significantly improves" becomes the measured delta. An adverb
-propping up a weak verb means the verb is wrong.
+that compensates for a weak verb means the verb is wrong.
 
 **7.5 Prefer the plain word.** "utilize" becomes "use", "leverage" becomes
 "use", "facilitate" becomes "help", "numerous" becomes "many", "in the event
 that" becomes "if". The fancier synonym is rarely clearer.
+
+**7.6 Mannered prose.** Metaphor or flourish where a literal phrase exists:
+aphorisms ("wire it or delete it"), personified code ("the plan holds it"),
+figurative verbs ("rides along", "stands on"), stock framing phrases. "A dial
+worth turning" becomes "a parameter worth varying". Say what you mean. Rule
+6.1 covers the metaphor nouns. A fragment written for effect belongs here too,
+and 7.7 still asks whether the reader has to decode it. The two verdicts are
+independent. At Reference the rule is absolute. At Explanatory and
+Conversational, ask what the figure or fragment replaces: if it carries the
+meaning, it is voice; if the sentence has no content without it, it is this
+pattern.
+
+**7.7 Over-compression.** Dropped articles, verbless fragments, symbol-speak,
+and unexpanded abbreviations that make the reader decode instead of read.
+"Parser rejects bad date -> exit 2, no write" becomes "The parser rejects a
+bad date, exits with code 2, and writes nothing." Write whole sentences with
+their articles and verbs, spell out arrows, and expand an abbreviation on
+first use unless the audience for that surface writes it unexpanded themselves
+("PR" in a pull request description, "API" in a library reference). The test
+is decoding, not length or form, and not the writer's purpose: a fragment
+written for effect is judged by 7.6 as well, and still fails this rule if the
+reader has to decode it. A label that names what follows, including the bold
+lead-in 3.4 allows, is not compression, and neither is a fragment the reader
+parses without effort.
