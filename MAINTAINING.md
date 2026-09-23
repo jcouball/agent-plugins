@@ -167,8 +167,12 @@ the manifest without doing either gets 1.0.0.
 npm run ci
 ```
 
-Five checks, each runnable on its own:
+Six checks, each runnable on its own:
 
+- `npm test` runs the tests for the check scripts themselves, with Node's
+  built-in test runner, so the scripts stay free of dependencies. The link
+  check's tests pin each heading-to-anchor case it has got wrong before; add
+  one whenever it gets another wrong.
 - `npm run lint:manifests` compares the marketplace manifest, the plugin
   manifests, and the skills on disk against each other, and fails when a skill
   is undeclared, a plugin is unlisted, a `SKILL.md` has no description, or
