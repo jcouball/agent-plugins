@@ -24,10 +24,12 @@ current project is not it, stop and say so.
    (never a vendored copy of the skill itself), applies the changes and
    additions from the first file found with the project file winning on
    conflict, and refuses to re-read or re-invoke the file that invoked it.
-   Copy the wording from the address-pr-feedback skill's Step 0, but list
-   only the two paths above with the new skill's name — the extra alias
-   paths there are specific to that skill's history — and end the description
-   with its sentence pointing at that step. Commands do not carry the
-   contract; it is for skills only.
+   Copy the wording from a skill that already carries it, listing only the
+   two paths above with the new skill's name, and end the description with
+   its sentence pointing at that step. The testing plugin's skills carry the
+   fullest version, which gives the fallback as a runnable `grep` and closes
+   with "If no override exists, run this skill as written"; address-pr-feedback
+   carries the same contract in prose, with extra alias paths specific to that
+   skill's history. Commands do not carry the contract; it is for skills only.
 5. Run `npm run ci` and fix anything it reports.
 6. Commit as `feat` scoped to the plugin, on a topic branch, and open a PR.
