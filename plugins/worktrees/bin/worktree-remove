@@ -65,10 +65,19 @@ registered() {
 # other repository is touched. prune is the fallback for a git too old to
 # remove a worktree whose directory it cannot find; it takes every stale
 # registration in that repository rather than only this one.
+#
+# $looked records whether either candidate turned out to be a repository at
+# all. A repository that was asked and did not hold the registration is a real
+# answer -- the registration is already clear -- but having asked nothing is
+# not, and the two are otherwise indistinguishable from the silence that
+# follows.
+looked=""
 found=""
 cleared=""
 for repo in "$derived" "$cwd"; do
   [ -n "$repo" ] && [ -d "$repo" ] || continue
+  git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || continue
+  looked=yes
   registered "$repo" || continue
   found=yes
   git -C "$repo" worktree remove --force -- "$worktree" >/dev/null 2>&1 ||
@@ -81,6 +90,11 @@ if [ -n "$found" ] && [ -z "$cleared" ]; then
   printf '%s\n' \
     "worktree-remove: $worktree is already gone, but its git registration could not be cleared." \
     "Run 'git worktree prune' in the repository that owns it to free the branch." >&2
+elif [ -z "$looked" ]; then
+  printf '%s\n' \
+    "worktree-remove: $worktree is already gone, and no repository was found to clear its" \
+    "registration from. If git refuses to check that branch out, its registration is still" \
+    "standing: run 'git worktree prune' in the repository that owns it to free the branch." >&2
 fi
 
 # Take the container with it once the last worktree leaves. rmdir -p climbs

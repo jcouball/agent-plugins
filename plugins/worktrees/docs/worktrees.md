@@ -47,8 +47,17 @@ outer/                      the outer repository
 That would recreate the problem this plugin exists to fix, in the outer
 repository instead of the inner one. So the hook still creates the worktree,
 just where Claude Code would have put it, at
-`vendor/inner/.claude/worktrees/<name>`. A nested repository therefore gets
-nothing from this plugin.
+`vendor/inner/.claude/worktrees/<name>`.
+
+Only when the outer repository would actually see the container, though. One
+that ignores it never notices it is there, and the repository that most often
+encloses a project is a dotfiles repository at `$HOME`, which ignores
+everything it does not track. Standing aside for that one would turn the plugin
+off for every project in the home directory. So the hook asks `git
+check-ignore` and keeps the `<path>.worktrees` layout when the answer is yes; a
+`check-ignore` that cannot answer counts as a no, which is the safe way to be
+wrong. A submodule is always the exception, whatever the superproject ignores,
+because a submodule is content the superproject tracks.
 
 Placing the container beside the outermost repository would fix that, at the
 cost of keying a repository's worktrees to a repository above it, colliding
@@ -57,22 +66,29 @@ nesting. This implementation does not take those costs on.
 
 ### Where the branch starts
 
-The branch is named after the worktree and starts from `origin/HEAD`, the
-remote's default branch, which is what Claude Code's own default
-(`worktree.baseRef: fresh`) does. Nothing is fetched first, so it starts from
-whatever your last fetch brought in, and a worktree still happens offline.
+The branch is named after the worktree and starts from the remote's default
+branch, which is what Claude Code's own default (`worktree.baseRef: fresh`)
+does. Nothing is fetched first, so it starts from whatever your last fetch
+brought in, and a worktree still happens offline.
 
-`origin/HEAD` is a local record of that default. `git clone` writes it; a
+The remote is `origin` when there is one. A repository cloned with `git clone
+-o <name>` has no `origin` and a single remote under another name, and that one
+is read instead: counting it as no remote at all would fall through to local
+`HEAD`, which is the outcome the last case below exists to refuse.
+
+`<remote>/HEAD` is a local record of that default. `git clone` writes it; a
 remote added by hand does not, and reading it back needs the network. So there
-are three cases, not two:
+are four cases, not two:
 
-- `origin/HEAD` is set. The branch starts there.
-- There is no `origin` remote. The branch starts from local `HEAD`, which is
-  the only base a repository without a remote has.
-- `origin` exists but `origin/HEAD` is not set. The hook fails and names the
-  fix, `git remote set-head origin --auto`. Starting from local `HEAD` here
-  would root a supposedly fresh worktree in whatever the main worktree happens to
-  have checked out, and nothing in the output would say so.
+- `<remote>/HEAD` is set. The branch starts there.
+- There are no remotes at all. The branch starts from local `HEAD`, which is
+  the only base such a repository has.
+- There are several remotes and none is named `origin`. Nothing says which of
+  them the default should come from, so the hook fails rather than pick one.
+- The remote is there but `<remote>/HEAD` is not set. The hook fails and names
+  the fix, `git remote set-head <remote> --auto`. Starting from local `HEAD`
+  here would root a supposedly fresh worktree in whatever the main worktree
+  happens to have checked out, and nothing in the output would say so.
 
 The new branch does not track its base. Tracking `origin/main` would make `git
 push` refuse for want of a matching upstream branch, make `git pull` merge the
@@ -93,11 +109,16 @@ use:
   worktree never counts, so asking for a worktree named after the branch
   checked out there is still git's error to give.
 
-git's registry decides this, not the disk. A directory alone is not a
-worktree, and a registration whose directory has been deleted is not one
-either. git calls the second prunable and goes on refusing to check that
-branch out anywhere else until it is cleared, so the hook clears it and then
-creates the worktree.
+Both come from git's registry, checked against the disk. A directory alone is
+not a worktree, and a registration whose directory has been deleted is not one
+either. git calls the second prunable and goes on refusing to check that branch
+out anywhere else until it is cleared, so the hook clears it and then creates
+the worktree.
+
+The disk is what tells those apart, rather than the `prunable` annotation in
+`git worktree list --porcelain`, which git did not print until 2.36 — newer
+than the version this plugin asks for. Reading it below 2.36 would make a
+deleted worktree look live and hand back a path that does not exist.
 
 ### Removing
 
@@ -111,7 +132,11 @@ A directory that is already gone is not the no-op it looks like. Its
 registration outlives it, and git keeps refusing to check that branch out
 anywhere else while the registration stands, so the hook clears the registration
 too. The hook finds the repository that holds it by reading the worktree's own
-path, which this plugin built from the main worktree and can read back.
+path, which this plugin built from the main worktree and can read back, and
+falls back to the session's directory for a worktree laid out some other way.
+When neither of those turns out to be a repository, the hook says so instead of
+exiting quietly: the registration it could not reach is the thing still holding
+the branch.
 
 ## Requirements
 
@@ -133,8 +158,8 @@ plugin on the value it was tested against if that default moves.
 ## What the plugin does not do
 
 If you work in a submodule, this plugin does nothing for you. Why, and why
-reaching further up is not the answer, is in [the exception above](#the-
-exception-submodules-and-nested-clones).
+reaching further up is not the answer, is in
+[the exception above](#the-exception-submodules-and-nested-clones).
 
 Beyond that, Claude Code does more than `git worktree add` when it creates a
 worktree itself. A hook replaces that whole step, so these do not happen:
