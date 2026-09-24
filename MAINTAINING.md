@@ -199,13 +199,13 @@ Seven checks, each runnable on its own:
   caught it.
 - `npm run test:worktrees:mutate` checks that those tests would catch a
   broken hook. [`mutate.mjs`](plugins/worktrees/test/mutate.mjs) breaks one
-  thing at a time, each a literal string replaced in a hook, and runs the suites
-  against every broken copy; a mutation they pass is a hole in them. Every
-  mutation is checked against the hooks before anything runs, so editing a hook
-  out from under its mutations fails the check rather than quietly testing
-  nothing, and the few mutations nothing can catch are listed as expected
-  survivors with the reason. Arguments filter by label, `MUTATE_JOBS` caps the
-  parallelism, and a full run takes about half a minute.
+  thing at a time, each one or more literal strings replaced in a file under
+  `bin/`, and runs the suites against every broken copy; a mutation they pass
+  is a hole in them. Every mutation is checked against those files before
+  anything runs, so editing a hook out from under its mutations fails the check
+  rather than quietly testing nothing, and the few mutations nothing can catch
+  are listed as expected survivors with the reason. Arguments filter by label,
+  `MUTATE_JOBS` caps the parallelism, and a full run takes about a minute.
 
 CI runs the same checks in three jobs, `Lint and Validate`,
 `Mutation Test Worktrees Hooks`, and `Verify Conventional Commits`.
