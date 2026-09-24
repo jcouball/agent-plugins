@@ -24,7 +24,12 @@ cwd=$(printf '%s' "$event" | jq -re '.cwd')
 # what names the working tree instead. --show-toplevel answers neither,
 # naming the linked worktree rather than the main one.
 common=$(git -C "$cwd" rev-parse --path-format=absolute --git-common-dir)
-inner=$(git --git-dir="$common" config --get core.worktree 2>/dev/null) || true
+#
+# --local, because core.worktree is a repository-local setting and reading it
+# off the whole stack picks up a global or system one too. That would redirect
+# every worktree the plugin places, in every repository, to whatever path the
+# stray value names.
+inner=$(git --git-dir="$common" config --get --local core.worktree 2>/dev/null) || true
 if [ -n "$inner" ]; then
   main_tree=$(CDPATH='' cd -- "$common" && CDPATH='' cd -- "$inner" && pwd -P)
 else
@@ -153,10 +158,10 @@ for stale in "$exact" "$other"; do
     git -C "$cwd" worktree prune >&2
 done
 
-mkdir -p -- "$container"
-
+# How the worktree gets created is worked out before anything is created, so
+# that a refusal below leaves no container behind either.
 if git -C "$cwd" show-ref --verify --quiet "refs/heads/$name"; then
-  git -C "$cwd" worktree add -- "$worktree" "$name" >&2
+  add=(add -- "$worktree" "$name")
 else
   # What worktree.baseRef "fresh" does: branch from the remote's default. No
   # fetch first, so a worktree still happens offline.
@@ -209,7 +214,10 @@ else
   # otherwise make the new branch track it: push refuses, pull merges the
   # default branch into the feature branch, and status counts ahead and
   # behind against the wrong thing.
-  git -C "$cwd" worktree add --no-track -b "$name" -- "$worktree" "$base" >&2
+  add=(add --no-track -b "$name" -- "$worktree" "$base")
 fi
+
+mkdir -p -- "$container"
+git -C "$cwd" worktree "${add[@]}" >&2
 
 printf '%s\n' "$worktree"

@@ -174,6 +174,22 @@ worktree itself. A hook replaces that whole step, so these do not happen:
   whose git hooks are installed by a package manager, husky for one, the hooks
   stay quiet in a new worktree until its install runs there too.
 
+One thing the hook cannot reach is `EnterWorktree`'s other job, switching a
+session that is already in a worktree into a different existing one. That check
+is on the path rather than on the worktree, and it is spelled
+`.claude/worktrees/` in Claude Code itself:
+
+```text
+Cannot enter worktree: <path> is not under <repo>/.claude/worktrees.
+Switching from this session is limited to worktrees managed by Claude Code
+(created under .claude/worktrees/ of this repository).
+```
+
+It applies whenever the calling session is itself in a worktree, so with this
+plugin installed, switching between sibling worktrees is refused; entering one
+from an ordinary session is not affected, and neither is creating one. Open the
+worktree as its own session instead. Verified against Claude Code 2.1.267.
+
 ## Turning the plugin off
 
 Disable or uninstall the plugin and Claude Code goes back to creating
