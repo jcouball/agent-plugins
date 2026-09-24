@@ -49,3 +49,22 @@ jobs:
 
       - name: Test the worktrees hooks
         run: npm run test:worktrees
+
+  # A job of its own because it is the slowest check, and it needs none of the
+  # lint job's dependencies: bash, git, jq, and Node, all on the runner.
+  mutate:
+    name: Mutation Test Worktrees Hooks
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Mutation test the worktrees hooks
+        run: npm run test:worktrees:mutate

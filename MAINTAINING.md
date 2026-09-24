@@ -170,7 +170,7 @@ the manifest without doing either gets 1.0.0.
 npm run ci
 ```
 
-Six checks, each runnable on its own:
+Seven checks, each runnable on its own:
 
 - `npm run lint:manifests` compares the marketplace manifest, the plugin
   manifests, and the skills on disk against each other, and fails when a skill
@@ -197,9 +197,22 @@ Six checks, each runnable on its own:
   again. `BIN` points a suite at another copy of the hooks, which is how a
   suite is run against the revision before a fix to confirm it would have
   caught it.
+- `npm run test:worktrees:mutate` checks that those tests would catch a
+  broken hook. [`mutate.mjs`](plugins/worktrees/test/mutate.mjs) breaks one
+  thing at a time, each a literal string replaced in a hook, and runs the suites
+  against every broken copy; a mutation they pass is a hole in them. Every
+  mutation is checked against the hooks before anything runs, so editing a hook
+  out from under its mutations fails the check rather than quietly testing
+  nothing, and the few mutations nothing can catch are listed as expected
+  survivors with the reason. Arguments filter by label, `MUTATE_JOBS` caps the
+  parallelism, and a full run takes about half a minute.
 
-CI runs the same checks in two jobs, `Lint and Validate` and
-`Verify Conventional Commits`.
+CI runs the same checks in three jobs, `Lint and Validate`,
+`Mutation Test Worktrees Hooks`, and `Verify Conventional Commits`.
+
+A change to a worktrees hook usually moves some mutation's anchor, and the
+check then names the mutations to update. Update them in the same commit as
+the hook, and add one for any new behavior worth protecting.
 
 A plugin that ships executables tests them; one that ships only markdown has
 nothing to run. There is no shared runner to join and no plugin is expected to
