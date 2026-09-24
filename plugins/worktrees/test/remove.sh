@@ -93,6 +93,7 @@ has "but says it had nowhere to look" "$ERR" "no repository was found"
 # whose directory it cannot find, and on a git new enough to do that the
 # fallback never changes the outcome -- replacing it with `true` passes this
 # whole suite. Covering it needs an old git binary, not another test.
+# mutate.mjs lists both copies of the fallback as expected survivors.
 #
 # A locked worktree whose directory is gone is the one case both calls miss:
 # git refuses `remove --force` on a lock and `prune` passes over it. That is
@@ -116,6 +117,15 @@ remove "$w" "$ROOT/does-not-exist"
 eq "the owner is derived from the path when cwd is useless" "$RC" "0"
 eq "and the registration is cleared" \
   "$(git -C "$ROOT/f1" worktree list --porcelain | grep -c "^worktree $w\$")" "0"
+
+git clone -q "$ROOT/up.git" "$ROOT/f3"
+mkdir -p "$ROOT/f3/.claude/worktrees"
+git -C "$ROOT/f3" worktree add -q -b nested "$ROOT/f3/.claude/worktrees/nested"
+rm -rf "$ROOT/f3/.claude/worktrees/nested"
+remove "$ROOT/f3/.claude/worktrees/nested" "$ROOT/does-not-exist"
+eq "the nested layout's owner is derived from the path too" "$RC" "0"
+eq "and its registration is cleared" \
+  "$(git -C "$ROOT/f3" worktree list --porcelain | grep -c "^worktree $ROOT/f3/.claude/worktrees/nested\$")" "0"
 
 git clone -q "$ROOT/up.git" "$ROOT/f2"
 mkdir -p "$ROOT/elsewhere"

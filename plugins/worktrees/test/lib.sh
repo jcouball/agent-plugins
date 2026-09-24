@@ -43,6 +43,10 @@ bad() {
   fail=$((fail + 1))
   printf '  FAIL %s\n' "$1"
   [ $# -gt 1 ] && printf '        %s\n' "$2"
+  # FAIL_FAST stops the suite at its first failure. The mutation battery needs
+  # nothing more than that, and it saves running the rest of the suite for
+  # every mutation it catches.
+  if [ -n "${FAIL_FAST:-}" ]; then exit 1; fi
   return 0
 }
 eq() { # eq <label> <got> <want>

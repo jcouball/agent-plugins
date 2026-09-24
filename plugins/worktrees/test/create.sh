@@ -13,8 +13,12 @@ mkremote up
 sec "event handling"
 raw_create 'not json at all'
 fails "malformed JSON fails"
-raw_create '{"cwd":"/tmp"}'
-fails "a missing name fails"
+git clone -q "$ROOT/up.git" "$ROOT/ev"
+raw_create "{\"cwd\":\"$ROOT/ev\"}"
+fails "a missing name fails, in a real repository"
+raw_create "{\"name\":null,\"cwd\":\"$ROOT/ev\"}"
+fails "a null name fails, in a real repository"
+no_dir "and neither leaves a worktree behind" "$ROOT/ev.worktrees"
 raw_create '{"name":"x"}'
 fails "a missing cwd fails"
 raw_create '{"name":"x","cwd":null}'
@@ -104,6 +108,18 @@ git -C "$ROOT/super" -c protocol.file.allow=always submodule -q add "$ROOT/up.gi
 create feature "$ROOT/super/sub"
 eq "a submodule uses Claude Code's layout" \
   "$OUT" "$ROOT/super/sub/.claude/worktrees/feature"
+
+# A superproject that ignores everything would let the container through the
+# parent-directory check, so only the superproject check stands a submodule
+# aside here.
+git init -q "$ROOT/super2"
+printf '*\n' > "$ROOT/super2/.gitignore"
+git -C "$ROOT/super2" add -f .gitignore
+git -C "$ROOT/super2" commit -q -m ignore-all
+git -C "$ROOT/super2" -c protocol.file.allow=always submodule -q add -f "$ROOT/up.git" sub 2>/dev/null
+create feature "$ROOT/super2/sub"
+eq "a submodule stands aside even when the superproject ignores everything" \
+  "$OUT" "$ROOT/super2/sub/.claude/worktrees/feature"
 
 git clone -q "$ROOT/up.git" "$ROOT/cw"
 mkdir -p "$ROOT/decoy"
