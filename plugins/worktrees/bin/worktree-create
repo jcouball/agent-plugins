@@ -1,0 +1,313 @@
+#!/usr/bin/env bash
+#
+# WorktreeCreate hook. Claude Code runs this instead of creating a worktree
+# itself, and takes the last non-empty line of stdout as the path, so git's
+# own output goes to stderr.
+#
+# The hook cannot decline: succeeding without printing a path is an error
+# rather than a fallback to the built-in layout. Everything below either
+# prints a path or fails, and git and jq report their own failures.
+
+set -euo pipefail
+
+# The name messages go out under, and the helpers both hooks share.
+hook=${0##*/}
+# shellcheck source=worktree-lib.sh disable=SC1091
+. "$(dirname -- "${BASH_SOURCE[0]}")/worktree-lib.sh"
+
+event=$(cat)
+name=$(printf '%s' "$event" | jq -re '.name')
+cwd=$(printf '%s' "$event" | jq -re '.cwd')
+
+# Claude Code checks a name before it calls this hook, and the check is
+# repeated here, in Claude Code's own terms, because the name becomes a path. An
+# empty one makes the container itself the worktree, where every later worktree
+# would land among its files; a . or .. segment climbs out of the container;
+# anything but letters, digits, dots, underscores and dashes has no business in
+# a branch name. jq -e rejects only null and false, so it lets all of these
+# through. jq does the check because its regular expressions do not depend on
+# the locale, where a shell's character ranges do.
+if ! printf '%s' "$event" | jq -e '
+  .name | type == "string" and length > 0 and length <= 64 and
+    (split("/") | all(
+      test("^[a-zA-Z0-9._-]+$") and . != "." and . != ".." and
+      (ascii_downcase | sub("\\.+$"; "")) != ".git"))
+' >/dev/null; then
+  printf '%s\n' \
+    "$hook: '$name' is not a worktree name Claude Code accepts: at most 64 characters," \
+    "in /-separated segments of letters, digits, dots, underscores and dashes," \
+    "none of them empty, . or .., or .git." >&2
+  exit 1
+fi
+
+# Named as Claude Code names its own: the directory is the name with every /
+# turned into +, so a slashed name stays one directory deep, and the branch is
+# that with worktree- in front. Anything else and a worktree Claude Code made
+# before this plugin was installed would never be found again, and a name that
+# happens to match an existing branch, main for one, would land on that branch
+# instead of a new one.
+flat=${name//\//+}
+branch=worktree-$flat
+
+# Which repository is this, and what is the container keyed on?
+#
+# For an ordinary repository the common dir is <main worktree>/.git, from the
+# main worktree and from any linked one alike, and the container sits beside
+# that main worktree. A submodule's common dir is <super>/.git/modules/<name>,
+# a directory of git metadata, and core.worktree is what names its working tree
+# instead; --local, because a global or system core.worktree would otherwise
+# redirect every repository's worktrees to wherever it points.
+#
+# Anything else has no main worktree to find. A bare repository has none at
+# all, and a repository cloned with --separate-git-dir has one that nothing in
+# the git directory points back to, so it can be found only from inside it, and
+# from a linked worktree not at all. The container is keyed on the common dir
+# itself there, which every worktree of the repository agrees on. Its parent
+# would not do: every repository kept in the same folder would share it.
+common=$(git -C "$cwd" rev-parse --path-format=absolute --git-common-dir)
+common=$(CDPATH='' cd -- "$common" && pwd -P)
+inner=$(git --git-dir="$common" config --get --local core.worktree 2>/dev/null) || true
+if [ -n "$inner" ]; then
+  main_tree=$(CDPATH='' cd -- "$common" && CDPATH='' cd -- "$inner" && pwd -P)
+  key=$main_tree
+elif [ "${common##*/}" = .git ]; then
+  main_tree=$(dirname -- "$common")
+  key=$main_tree
+else
+  main_tree=''
+  key=$common
+fi
+
+# Where Claude Code's own layout puts worktrees: <root>/.claude/worktrees,
+# where root is the main worktree when there is one and otherwise the worktree
+# the session is in. A bare repository's own directory is no worktree at all,
+# and has no root.
+if [ -n "$main_tree" ]; then
+  claude_root=$main_tree
+else
+  claude_root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || claude_root=''
+fi
+
+# Beside the key, keyed on its full path so two clones sharing a directory
+# name do not share a container.
+#
+# Unless beside it lands inside another repository's working tree, where the
+# container recreates in that repository the problem this plugin exists to fix
+# in this one. A submodule is one way to get there and a clone made inside
+# another clone is the other.
+#
+# Landing inside is not enough on its own. An outer repository that ignores the
+# container never sees it, and the repository that most often encloses a
+# project is a dotfiles repository at $HOME, which ignores everything it does
+# not track. Standing aside for that would turn the plugin off for every
+# project in the home directory, so the test is whether the outer repository
+# would actually notice, which is what check-ignore answers. A check-ignore
+# that cannot answer -- a bare outer repository, a path it will not take --
+# exits non-zero and counts as noticing, which is the safe way to be wrong.
+#
+# The superproject check stays for a submodule whose working tree git placed
+# somewhere else entirely, where the directory above it says nothing. Claude
+# Code's own layout stands in these cases.
+parent=$(dirname -- "$key")
+container="$key.worktrees"
+if [ -n "$(git -C "$cwd" rev-parse --show-superproject-working-tree 2>/dev/null)" ] ||
+  { [ "$(git -C "$parent" rev-parse --is-inside-work-tree 2>/dev/null)" = "true" ] &&
+    ! git -C "$parent" check-ignore --quiet -- "$container" 2>/dev/null; }; then
+  if [ -z "$claude_root" ]; then
+    printf '%s\n' \
+      "$hook: $container would land inside another repository, and a bare repository" \
+      "has no worktree of its own to stand aside into. Start the session in one of its worktrees." >&2
+    exit 1
+  fi
+  container="$claude_root/.claude/worktrees"
+fi
+
+# Resolved, because Claude Code refuses a worktree path that is a symlink.
+#
+# Resolving a directory means entering it, and the container is not created
+# until a worktree is actually going in it, so that a resume answering with
+# some other path leaves no empty container behind. So resolve the part that is
+# already there and keep the rest as written; what is missing is created below,
+# by mkdir, as real directories.
+resolved() {
+  local path=$1 tail=''
+  while [ ! -d "$path" ]; do
+    tail=/$(basename -- "$path")$tail
+    path=$(dirname -- "$path")
+  done
+  printf '%s' "$(CDPATH='' cd -- "$path" && pwd -P)$tail"
+}
+container=$(resolved "$container")
+worktree=$container/$flat
+
+# Where Claude Code itself would have put this worktree, for one made before
+# the plugin was installed. The same place as ours in the nested layout.
+legacy=''
+if [ -n "$claude_root" ]; then
+  legacy=$(resolved "$claude_root/.claude/worktrees")/$flat
+  if [ "$legacy" = "$worktree" ]; then legacy=''; fi
+fi
+
+# Claude Code resumes a worktree by asking for its name again, so a name
+# already in use has to come back as a path rather than an error. Only two
+# places count, as they do for Claude Code, which resumes by path: ours, and
+# the one Claude Code's own layout gives the name. Both hold only worktrees
+# Claude Code or this plugin made. A worktree somewhere else is someone's own,
+# even on a worktree- branch, and is never handed back: the session would be
+# working in it, and at the end removal would be offered for it.
+#
+# A worktree elsewhere that holds our branch still matters, because git will
+# not check the branch out twice. It is refused below by name rather than left
+# for `worktree add` to fail on after the container has been made. The main
+# worktree counts like any other: it is never resumed into, since it is never
+# at either path, but holding the branch it blocks the add all the same.
+registry=$(worktree_list "$cwd")
+matches=$(WANT="$worktree" LEGACY="$legacy" BRANCH="refs/heads/$branch" awk '
+  BEGIN { RS = "\036" }
+  function flush() {
+    if (path != "") {
+      if (path == ENVIRON["WANT"]) print "exact\037" path
+      else if (path == ENVIRON["LEGACY"]) print "legacy\037" path
+      else if (br == ENVIRON["BRANCH"]) print "held\037" path
+    }
+    path = ""; br = ""
+  }
+  $1 == "worktree" { flush(); path = substr($0, 10); next }
+  $1 == "branch"   { br = substr($0, 8); next }
+  $0 == ""         { flush(); next }
+  END { flush() }
+' <<<"$registry")
+
+# A registration counts as a worktree only while its directory is still there.
+# An unregistered directory is not a worktree, and a registration whose
+# directory has been deleted is not one either: git calls the second prunable
+# and goes on refusing to check that branch out anywhere else until it is
+# cleared.
+#
+# The disk is what says which, rather than the porcelain's own `prunable`
+# annotation, which git only started printing in 2.36 and the floor here is
+# 2.31. In between, a deleted worktree reads as live and the hook hands back a
+# path that does not exist.
+exact='' legacy_live='' held='' stale=()
+while IFS=$'\037' read -r kind path; do
+  [ -n "$kind" ] || continue
+  if [ ! -d "$path" ]; then
+    stale+=("$path")
+    continue
+  fi
+  case $kind in
+  exact) exact=$path ;;
+  legacy) legacy_live=$path ;;
+  held) held=$path ;;
+  esac
+done <<<"$matches"
+
+if [ -n "$exact" ]; then
+  printf '%s\n' "$exact"
+  exit 0
+fi
+if [ -n "$legacy_live" ]; then
+  printf '%s\n' "$legacy_live"
+  exit 0
+fi
+if [ -n "$held" ]; then
+  printf '%s\n' \
+    "$hook: branch $branch is checked out in $held," \
+    "which neither Claude Code nor this plugin put there, so it is not reused." \
+    "Remove that worktree, or ask for a different name." >&2
+  exit 1
+fi
+
+# Nothing to resume into, so whatever matched above is a registration whose
+# directory is gone, and each blocks what comes next: the path, or the branch.
+# A lock on one is honored as Claude Code honors it.
+for path in ${stale[@]+"${stale[@]}"}; do
+  clear_registration "$cwd" "$path" || exit 1
+done
+
+# How the worktree gets created is worked out before anything is created, so
+# that a refusal below leaves no container behind either.
+if git -C "$cwd" show-ref --verify --quiet "refs/heads/$branch"; then
+  add=(add -- "$worktree" "$branch")
+else
+  # What worktree.baseRef "fresh" does: branch from the remote's default. No
+  # fetch first, so a worktree still happens offline.
+  #
+  # <remote>/HEAD is where that default is recorded locally. git clone writes
+  # it; a remote added by hand does not, and reading it back needs the
+  # network. Falling through to local HEAD there would root a "fresh"
+  # worktree in whatever the main worktree happens to have checked out, quietly
+  # and usually wrongly, so a remote carrying no default is refused by name
+  # instead. So is one whose default names a branch that is gone, which is
+  # what a default branch renamed upstream and then pruned locally leaves.
+  #
+  # Which remote is origin when there is one. A repository cloned with
+  # `git clone -o <name>` has no origin and one remote under another name, and
+  # that name is the one to read: treating it as no remote at all would fall
+  # through to local HEAD, the outcome refused just above. Several remotes and
+  # no origin gives nothing to choose on, so that is refused rather than
+  # guessed at.
+  remotes=$(git -C "$cwd" remote)
+  remote=''
+  only=''
+  count=0
+  if [ -n "$remotes" ]; then
+    while IFS= read -r candidate; do
+      count=$((count + 1))
+      only=$candidate
+      if [ "$candidate" = origin ]; then remote=origin; fi
+    done <<<"$remotes"
+    if [ -z "$remote" ] && [ "$count" -eq 1 ]; then remote=$only; fi
+  fi
+
+  # A bare repository answers where a remote records nothing. A bare clone
+  # keeps no remote-tracking branches at all: its own branches are the
+  # remote's, and its HEAD is the remote's default as the clone found it.
+  # Nothing is checked out in a bare repository for that HEAD to have drifted
+  # to, which is what rules local HEAD out everywhere else. It is read from the
+  # common dir, because in a linked worktree HEAD is that worktree's own.
+  bare_head=''
+  if [ "$(git --git-dir="$common" config --get --local --bool core.bare 2>/dev/null)" = true ]; then
+    bare_head=$(git --git-dir="$common" symbolic-ref --quiet HEAD 2>/dev/null) || bare_head=''
+  fi
+
+  if [ -z "$remotes" ]; then
+    # The only base a repository without a remote has.
+    base=${bare_head:-HEAD}
+  elif [ -z "$remote" ] && [ -n "$bare_head" ]; then
+    base=$bare_head
+  elif [ -z "$remote" ]; then
+    printf '%s\n' \
+      "$hook: this repository has several remotes and none named origin," \
+      "so a fresh worktree has no base. Record a default on the one to branch from:" \
+      "  git -C '$cwd' remote set-head <remote> --auto" \
+      "and name it origin, or add an origin remote." >&2
+    exit 1
+  elif ! base=$(git -C "$cwd" symbolic-ref --quiet "refs/remotes/$remote/HEAD") &&
+    [ -n "$bare_head" ]; then
+    base=$bare_head
+  elif [ -z "$base" ]; then
+    printf '%s\n' \
+      "$hook: $remote has no recorded default branch, so a fresh worktree has no base." \
+      "Record it once, then try again:" \
+      "  git -C '$cwd' remote set-head $remote --auto" >&2
+    exit 1
+  elif ! git -C "$cwd" show-ref --verify --quiet "$base"; then
+    printf '%s\n' \
+      "$hook: $remote/HEAD points at ${base#refs/remotes/}, which no longer exists," \
+      "so a fresh worktree has no base. Record the current default, then try again:" \
+      "  git -C '$cwd' remote set-head $remote --auto" >&2
+    exit 1
+  fi
+
+  # --no-track because the base is a remote-tracking branch and git would
+  # otherwise make the new branch track it: push refuses, pull merges the
+  # default branch into the feature branch, and status counts ahead and
+  # behind against the wrong thing.
+  add=(add --no-track -b "$branch" -- "$worktree" "$base")
+fi
+
+mkdir -p -- "$container"
+git -C "$cwd" worktree "${add[@]}" >&2
+
+printf '%s\n' "$worktree"

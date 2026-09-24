@@ -26,6 +26,7 @@ The `jcouball-marketplace` plugin ships commands for setting that up.
 /plugin install jcouball-github@jcouball
 /plugin install jcouball-marketplace@jcouball
 /plugin install jcouball-testing@jcouball
+/plugin install jcouball-worktrees@jcouball
 ```
 
 Run these once per machine. They are Claude Code slash commands. The VS Code
@@ -38,6 +39,7 @@ claude plugin install jcouball-writing@jcouball
 claude plugin install jcouball-github@jcouball
 claude plugin install jcouball-marketplace@jcouball
 claude plugin install jcouball-testing@jcouball
+claude plugin install jcouball-worktrees@jcouball
 ```
 
 ## Update
@@ -48,6 +50,7 @@ claude plugin update jcouball-writing@jcouball
 claude plugin update jcouball-github@jcouball
 claude plugin update jcouball-marketplace@jcouball
 claude plugin update jcouball-testing@jcouball
+claude plugin update jcouball-worktrees@jcouball
 ```
 
 Refresh the marketplace first. Without it, `update` reads a stale cache and
@@ -82,6 +85,20 @@ Code.
 | Component | Name | What it does |
 | --- | --- | --- |
 | Skill | `testing-guide` | Points at the plugin's [testing guide](plugins/testing/docs/testing-guide.md), which defines the vocabulary for talking about tests, classifies them on six dimensions, and says which kind to write, with sections mapping it to Ruby, RSpec, and Rails. Loaded when asked why a testing rule exists or what a term means, not for ordinary test writing. |
+
+### jcouball-worktrees
+
+| Component | Name | What it does |
+| --- | --- | --- |
+| Hook | `WorktreeCreate` | Creates the worktree Claude Code asked for at `<working-tree>.worktrees/<name>`, beside the project rather than in `.claude/worktrees/<name>` inside it, on a branch off the remote's default. |
+| Hook | `WorktreeRemove` | Removes that worktree when the session leaves it, takes the container with it once the last one goes, and keeps the branch. |
+
+No skills and no commands: installing it changes where worktrees land and
+nothing else. A hook replaces the whole creation step, so some of what Claude
+Code does for a worktree of its own stops happening.
+[What the plugin does not do](plugins/worktrees/docs/worktrees.md#what-the-plugin-does-not-do)
+is the list, submodules among them, and the rest of that page covers the `jq`
+and git version requirements.
 
 ### jcouball-marketplace
 

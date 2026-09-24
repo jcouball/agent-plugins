@@ -1,0 +1,148 @@
+#!/usr/bin/env bash
+#
+# WorktreeRemove hook. Claude Code runs this when a session leaves a worktree
+# it was told to remove, in place of removing the worktree itself.
+#
+# The branch is left alone. Claude Code asked for the worktree to go, not the
+# work in it, and an unmerged branch is cheap to keep and expensive to lose.
+
+set -euo pipefail
+
+# The name messages go out under, and the helpers both hooks share.
+hook=${0##*/}
+# shellcheck source=worktree-lib.sh disable=SC1091
+. "$(dirname -- "${BASH_SOURCE[0]}")/worktree-lib.sh"
+
+event=$(cat)
+worktree=$(printf '%s' "$event" | jq -re '.worktree_path')
+cwd=$(printf '%s' "$event" | jq -re '.cwd')
+
+# A main worktree is not a worktree to remove: taking it would take the
+# repository with it. git refuses that on its own when asked by name, but the
+# removal below answers a failed removal with prune, which would swallow the
+# refusal and report a registration it could not clear. So it is refused here
+# instead, while the refusal can still be said plainly.
+#
+# A linked worktree's git dir sits inside the common dir, at
+# <common>/worktrees/<name>; a main worktree's is the common dir. That holds
+# however the repository was laid out, including the separate-git-dir case
+# where the .git a linked worktree carries as a file is one here too.
+#
+# Only when the directory is the top of the worktree git found, though. One
+# with no .git of its own, a leftover whose registration and .git file are both
+# gone, sends git searching upward, and it answers for the repository around
+# the directory: the project itself in the nested layout, or a dotfiles
+# repository enclosing the container. That is the enclosing repository's main
+# worktree, not this directory, which is left for the removal below.
+if top=$(git -C "$worktree" rev-parse --show-toplevel 2>/dev/null) &&
+  [ "$top" = "$(CDPATH='' cd -- "$worktree" && pwd -P)" ]; then
+  git_dir=$(git -C "$worktree" rev-parse --path-format=absolute --git-dir)
+  git_common=$(git -C "$worktree" rev-parse --path-format=absolute --git-common-dir)
+  if [ "$git_dir" = "$git_common" ]; then
+    printf '%s\n' \
+      "$hook: $worktree is a repository's main worktree, not a linked worktree," \
+      "so it was left where it is." >&2
+    exit 1
+  fi
+
+  # A linked worktree, then, and one that may have been moved by hand. Its .git
+  # file still leads to its registration, but the registration still names the
+  # path it was moved from, so nothing below would match it where it is now,
+  # and it would be taken for a leftover and deleted, lock or no lock. repair,
+  # run from inside it, points the registration at where it is; for a worktree
+  # that was never moved there is nothing to repair.
+  git -C "$worktree" worktree repair >/dev/null 2>&1 || true
+fi
+
+# The path names its own owner. Every worktree this plugin or Claude Code makes
+# sits directly in a container: <key>.worktrees, where the key is the main
+# worktree or, for a bare repository, its git directory, or else
+# <root>/.claude/worktrees. The directory holding the worktree is that
+# container, and the path in front of it is where the registration lives.
+container=$(dirname -- "$worktree")
+derived=""
+case $container in
+*/.claude/worktrees) derived=${container%/.claude/worktrees} ;;
+*.worktrees) derived=${container%.worktrees} ;;
+*) container="" ;;
+esac
+
+# A worktree anywhere else is not one either of them made, and it is refused
+# while it is still there. Claude Code hands this hook the path the create hook
+# gave it, so this is not a case the plugin produces; it is one where whatever
+# is at the path is someone's own, and a forced removal would take their work
+# with it. Its registration is still cleared once the directory is gone, since
+# that deletes nothing.
+if [ -z "$container" ] && [ -d "$worktree" ]; then
+  printf '%s\n' \
+    "$hook: $worktree is not in a directory this plugin or Claude Code puts" \
+    "worktrees in, so it was left where it is. Remove it yourself if it should go:" \
+    "  git worktree remove '$worktree'" >&2
+  exit 1
+fi
+
+# Which repository is asked to do the removal. The worktree answers for itself
+# while it is still a worktree, so it is tried first and the ordinary case
+# needs nothing else. It stops answering the moment its registration goes --
+# an interrupted earlier run, a hand-edited .git/worktrees, gc's own worktree
+# prune -- and `git -C <worktree>` then fails with `not a git repository`
+# instead of reaching a repository that could still clear it.
+#
+# $derived is where the path says the registration lives, and $cwd is the
+# fallback for a worktree laid out some other way; it is the session's
+# directory, which may be the one that just vanished.
+#
+# $looked records whether any candidate turned out to be a repository at all. A
+# repository that was asked and did not hold the registration is a real answer
+# -- the registration is already clear -- but having asked nothing is not, and
+# the two are otherwise indistinguishable from the silence that follows.
+looked=""
+owner=""
+state=""
+for repo in "$worktree" "$derived" "$cwd"; do
+  [ -n "$repo" ] && [ -d "$repo" ] || continue
+  git -C "$repo" rev-parse --git-dir >/dev/null 2>&1 || continue
+  looked=yes
+  if state=$(registration_of "$repo" "$worktree"); then
+    owner=$repo
+    break
+  fi
+done
+
+if [ -n "$owner" ]; then
+  if [ -d "$worktree" ]; then
+    # Forced, because Claude Code asks before choosing removal and this runs
+    # after that answer. A lock is honored as Claude Code honors it: a stale one
+    # left by a session that is gone is broken, and any other stops the removal
+    # with the worktree still there.
+    IFS=$'\037' read -r locked reason <<<"$state"
+    free_lock "$owner" "$worktree" "$locked" "$reason" || exit 1
+    git -C "$owner" worktree remove --force -- "$worktree" >&2
+  else
+    # The directory is gone and the registration is not, which is not the
+    # no-op it looks like: git goes on refusing to check that branch out
+    # anywhere else while it stands. Failing to clear it deletes nothing, so it
+    # is reported and the hook still succeeds.
+    clear_registration "$owner" "$worktree" || true
+  fi
+elif [ -d "$worktree" ]; then
+  # The directory outlived its registration, so there is nothing left for git
+  # to remove it by name and the directory is this hook's to take. It is in a
+  # container, or the check above would have stopped here, and it is no
+  # worktree of its own: a linked one, moved or not, was matched to its
+  # registration by the repair above and answers the loop as its own owner, and
+  # a main worktree was refused before any of this.
+  rm -rf -- "$worktree"
+elif [ -z "$looked" ]; then
+  printf '%s\n' \
+    "$hook: $worktree is already gone, and no repository was found to clear its" \
+    "registration from. If git refuses to check that branch out, its registration is still" \
+    "standing: run 'git worktree prune' in the repository that owns it to free the branch." >&2
+fi
+
+# Take the container with it once the last worktree leaves, and nothing above
+# it. The directory holding the container is the project's own, .claude for
+# the nested layout, and not this plugin's to remove even when it is empty.
+if [ -n "$container" ]; then
+  rmdir -- "$container" 2>/dev/null || true
+fi
