@@ -18,6 +18,7 @@ plugins/<plugin>/
   commands/<command>.md             one file per slash command
   hooks/hooks.json                  the plugin's hooks, discovered by path
   bin/<name>                        executables the plugin's hooks run
+  test/                             what tests those executables, if any
 scripts/                            the checks and the local install helper
 metrics/<report>/                   a report, its data, the script that makes it
 ```
@@ -169,7 +170,7 @@ the manifest without doing either gets 1.0.0.
 npm run ci
 ```
 
-Five checks, each runnable on its own:
+Six checks, each runnable on its own:
 
 - `npm run lint:manifests` compares the marketplace manifest, the plugin
   manifests, and the skills on disk against each other, and fails when a skill
@@ -188,9 +189,21 @@ Five checks, each runnable on its own:
   Command files get their own nested config that drops the first-line-heading
   rule, since they are prompts, not documents.
 - `npm run lint:commits` runs commitlint over the commits not yet on `main`.
+- `npm run test:worktrees` runs the worktrees plugin's hook tests, which are
+  plain bash: [`plugins/worktrees/test/run.sh`](plugins/worktrees/test/run.sh)
+  drives one suite per hook. Each builds throwaway repositories under its own
+  temporary directory, with git's global and system configuration replaced so
+  the result does not depend on the machine it runs on, and takes them away
+  again. `BIN` points a suite at another copy of the hooks, which is how a
+  suite is run against the revision before a fix to confirm it would have
+  caught it.
 
 CI runs the same checks in two jobs, `Lint and Validate` and
 `Verify Conventional Commits`.
+
+A plugin that ships executables tests them; one that ships only markdown has
+nothing to run. There is no shared runner to join and no plugin is expected to
+grow tests because another one has them.
 
 ## Adding a skill
 

@@ -46,3 +46,6 @@ jobs:
 
       - name: Lint markdown
         run: npm run lint:markdown
+
+      - name: Test the worktrees hooks
+        run: npm run test:worktrees

@@ -11,7 +11,8 @@
     "lint:actions": "node scripts/check-actions.mjs",
     "lint:markdown": "markdownlint-cli2",
     "lint:commits": "commitlint --from origin/main --to HEAD",
-    "ci": "npm run lint:manifests && npm run lint:links && npm run lint:actions && npm run lint:markdown && npm run lint:commits",
+    "test:worktrees": "bash plugins/worktrees/test/run.sh",
+    "ci": "npm run lint:manifests && npm run lint:links && npm run lint:actions && npm run lint:markdown && npm run lint:commits && npm run test:worktrees",
     "sync": "node scripts/sync-plugins.mjs"
   },
   "devDependencies": {
