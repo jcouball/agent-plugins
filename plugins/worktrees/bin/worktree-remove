@@ -1,0 +1,89 @@
+#!/usr/bin/env bash
+#
+# WorktreeRemove hook. Claude Code runs this when a session leaves a worktree
+# it was told to remove, in place of removing the worktree itself.
+#
+# The branch is left alone. Claude Code asked for the worktree to go, not the
+# work in it, and an unmerged branch is cheap to keep and expensive to lose.
+
+set -euo pipefail
+
+event=$(cat)
+worktree=$(printf '%s' "$event" | jq -re '.worktree_path')
+cwd=$(printf '%s' "$event" | jq -re '.cwd')
+
+if [ -d "$worktree" ]; then
+  # Run from inside the worktree, so nothing here has to work out which
+  # worktree owns it, and forced, because Claude Code asks before choosing
+  # removal and this runs after that answer. git refuses a main worktree on
+  # its own.
+  git -C "$worktree" worktree remove --force -- "$worktree" >&2
+  rmdir -p -- "$(dirname -- "$worktree")" 2>/dev/null || true
+  exit 0
+fi
+
+# The directory is gone already, removed by hand or by an interrupted earlier
+# run. Its registration under .git/worktrees is not, and git goes on refusing
+# to check that branch out anywhere else while the registration stands, so
+# leaving it is not the harmless no-op it looks like.
+#
+# Clearing it needs a repository to run the removal from, and the worktree can
+# no longer be it. The path names its own owner: every container this plugin
+# makes is <main worktree>.worktrees, and the layout it stands aside for is
+# <main worktree>/.claude/worktrees, so walking up to the first of those gives
+# the tree that holds the registration. $cwd is the fallback for a worktree
+# laid out some other way; it is the session's directory, which may be the one
+# that just vanished.
+d=$(dirname -- "$worktree")
+derived=""
+while :; do
+  case $d in
+  */.claude/worktrees)
+    derived=${d%/.claude/worktrees}
+    break
+    ;;
+  *.worktrees)
+    derived=${d%.worktrees}
+    break
+    ;;
+  / | .)
+    break
+    ;;
+  esac
+  d=$(dirname -- "$d")
+done
+
+# Is $worktree still in this repository's registry?
+registered() {
+  local registry
+  registry=$(git -C "$1" worktree list --porcelain 2>/dev/null) || return 1
+  awk -v want="worktree $worktree" '$0 == want { found = 1 } END { exit !found }' <<<"$registry"
+}
+
+# Only the repository that holds the registration is asked to clear it, so a
+# second removal of the same path finds nothing to do and says nothing, and no
+# other repository is touched. prune is the fallback for a git too old to
+# remove a worktree whose directory it cannot find; it takes every stale
+# registration in that repository rather than only this one.
+found=""
+cleared=""
+for repo in "$derived" "$cwd"; do
+  [ -n "$repo" ] && [ -d "$repo" ] || continue
+  registered "$repo" || continue
+  found=yes
+  git -C "$repo" worktree remove --force -- "$worktree" >/dev/null 2>&1 ||
+    git -C "$repo" worktree prune >&2
+  registered "$repo" || cleared=yes
+  break
+done
+
+if [ -n "$found" ] && [ -z "$cleared" ]; then
+  printf '%s\n' \
+    "worktree-remove: $worktree is already gone, but its git registration could not be cleared." \
+    "Run 'git worktree prune' in the repository that owns it to free the branch." >&2
+fi
+
+# Take the container with it once the last worktree leaves. rmdir -p climbs
+# while each directory is empty and stops at the first that is not, which is
+# the one holding the main worktree.
+rmdir -p -- "$(dirname -- "$worktree")" 2>/dev/null || true

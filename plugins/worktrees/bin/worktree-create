@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+#
+# WorktreeCreate hook. Claude Code runs this instead of creating a worktree
+# itself, and takes the last non-empty line of stdout as the path, so git's
+# own output goes to stderr.
+#
+# The hook cannot decline: succeeding without printing a path is an error
+# rather than a fallback to the built-in layout. Everything below either
+# prints a path or fails, and git and jq report their own failures.
+
+set -euo pipefail
+
+event=$(cat)
+name=$(printf '%s' "$event" | jq -re '.name')
+cwd=$(printf '%s' "$event" | jq -re '.cwd')
+
+# Which main worktree does $cwd belong to? Inside a submodule it sits in two
+# of them, the submodule's and the superproject's, and git counts the
+# submodule.
+#
+# The parent of the common dir answers for an ordinary repository and from
+# inside a linked worktree. In a submodule that parent is
+# <super>/.git/modules, a directory of git metadata, and core.worktree is
+# what names the working tree instead. --show-toplevel answers neither,
+# naming the linked worktree rather than the main one.
+common=$(git -C "$cwd" rev-parse --path-format=absolute --git-common-dir)
+inner=$(git --git-dir="$common" config --get core.worktree 2>/dev/null) || true
+if [ -n "$inner" ]; then
+  main_tree=$(CDPATH='' cd -- "$common" && CDPATH='' cd -- "$inner" && pwd -P)
+else
+  main_tree=$(CDPATH='' cd -- "$(dirname -- "$common")" && pwd -P)
+fi
+
+# Beside that worktree, keyed on its full path so two clones sharing a
+# directory name do not share a container.
+#
+# Unless that worktree is itself inside another repository, where beside it
+# lands inside that outer tree, recreating in the outer repository the problem
+# this plugin exists to fix in the inner one. A submodule is one way to get
+# there and a clone made inside another clone is the other. The directory
+# above the worktree answers for both, because anything git claims as a
+# working tree there is a tree to stay out of. The superproject check stays
+# for a submodule whose working tree git placed somewhere else entirely,
+# where the directory above it says nothing. Claude Code's own layout stands
+# in these cases.
+parent=$(dirname -- "$main_tree")
+if [ -n "$(git -C "$cwd" rev-parse --show-superproject-working-tree 2>/dev/null)" ] ||
+  [ "$(git -C "$parent" rev-parse --is-inside-work-tree 2>/dev/null)" = "true" ]; then
+  container="$main_tree/.claude/worktrees"
+else
+  container="$main_tree.worktrees"
+fi
+mkdir -p -- "$container"
+
+# Resolved, because Claude Code refuses a worktree path that is a symlink.
+worktree=$(CDPATH='' cd -- "$container" && pwd -P)/$name
+
+# Claude Code resumes a worktree by asking for its name again, so a name
+# already in use has to come back as a path rather than an error. git's
+# registry decides that, not the disk: an unregistered directory is not a
+# worktree, and a registration whose directory has been deleted is not one
+# either. git calls the second prunable, and keeps refusing to check that
+# branch out anywhere else until it is pruned.
+#
+# Read into a variable and handed to awk rather than piped into grep -q. Past
+# a few hundred worktrees the listing outruns the pipe buffer, grep -q stops
+# reading at the first match, and pipefail turns git's SIGPIPE into a failure
+# of the test itself. That reads as "not registered", and creation then dies
+# on `already exists`.
+registry=$(git -C "$cwd" worktree list --porcelain)
+
+# Two ways a name resolves to an existing worktree. The path we would have
+# picked is the ordinary one. The branch checked out somewhere else is the
+# worktree this plugin did not place, such as one left at Claude Code's own
+# <repo>/.claude/worktrees/<name> from before the plugin was installed, which
+# git would otherwise refuse as `already used by worktree at`. Either way the
+# answer is where it is, not an error. git lists the main worktree first and
+# it is never a worktree to resume into.
+resume=$(awk -v want="$worktree" -v branch="refs/heads/$name" '
+  function flush() {
+    if (path != "") {
+      if (path == want) { if (prunable) stale = 1; else exact = path }
+      else if (n > 1 && !prunable && br == branch && other == "") other = path
+    }
+    path = ""; br = ""; prunable = 0
+  }
+  $1 == "worktree" { flush(); n++; path = substr($0, 10); next }
+  $1 == "branch"   { br = substr($0, 8); next }
+  $1 == "prunable" { prunable = 1; next }
+  $0 == ""         { flush(); next }
+  END {
+    flush()
+    if (exact != "") print "resume " exact
+    else if (other != "") print "resume " other
+    else if (stale) print "stale"
+  }
+' <<<"$registry")
+
+case $resume in
+"resume "*)
+  printf '%s\n' "${resume#resume }"
+  exit 0
+  ;;
+stale)
+  # The path we want is registered to a directory that is gone, so nothing can
+  # be created there until the registration is. Removing it by name takes only
+  # that one; prune is the fallback for a git too old to remove a worktree it
+  # cannot find, and clears every stale registration in the repository.
+  git -C "$cwd" worktree remove --force -- "$worktree" >/dev/null 2>&1 ||
+    git -C "$cwd" worktree prune >&2
+  ;;
+esac
+
+if git -C "$cwd" show-ref --verify --quiet "refs/heads/$name"; then
+  git -C "$cwd" worktree add -- "$worktree" "$name" >&2
+else
+  # What worktree.baseRef "fresh" does: branch from the remote's default. No
+  # fetch first, so a worktree still happens offline.
+  #
+  # origin/HEAD is where that default is recorded locally. git clone writes
+  # it; a remote added by hand does not, and reading it back needs the
+  # network. Falling through to local HEAD there would root a "fresh"
+  # worktree in whatever the main worktree happens to have checked out, quietly
+  # and usually wrongly, so an origin carrying no default is refused by name
+  # instead.
+  if base=$(git -C "$cwd" symbolic-ref --quiet --short refs/remotes/origin/HEAD); then
+    :
+  elif ! git -C "$cwd" remote get-url origin >/dev/null 2>&1; then
+    base=HEAD
+  else
+    printf '%s\n' \
+      "worktree-create: origin has no recorded default branch, so a fresh worktree has no base." \
+      "Record it once, then try again:" \
+      "  git -C '$cwd' remote set-head origin --auto" >&2
+    exit 1
+  fi
+
+  # --no-track because the base is a remote-tracking branch and git would
+  # otherwise make the new branch track it: push refuses, pull merges the
+  # default branch into the feature branch, and status counts ahead and
+  # behind against the wrong thing.
+  git -C "$cwd" worktree add --no-track -b "$name" -- "$worktree" "$base" >&2
+fi
+
+printf '%s\n' "$worktree"
