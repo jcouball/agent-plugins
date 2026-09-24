@@ -119,6 +119,21 @@ mkremote() { # mkremote <name>
   git -C "$ROOT/$1.git" symbolic-ref HEAD refs/heads/main
 }
 
+# The id of a process that has already exited, for a lock left by a session
+# that is gone. A pid is reused eventually, but not in the moment between here
+# and the hook reading it.
+dead_pid() {
+  bash -c 'exit 0' &
+  local pid=$!
+  wait "$pid"
+  printf '%s' "$pid"
+}
+
+# A lock reason in the form Claude Code writes when it locks a worktree it made.
+claude_lock_reason() { # claude_lock_reason <name> <pid>
+  printf 'claude session %s (pid %s start Thu Sep 24 09:00:00 2026)' "$1" "$2"
+}
+
 report() {
   printf '\n%s: passed %d, failed %d\n' "${SUITE:-suite}" "$pass" "$fail"
   [ "$fail" -eq 0 ]

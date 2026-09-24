@@ -10,8 +10,9 @@ When that fails your run, the fix is on a branch you are not working on, and
 nothing in the output says so. Every such tool needs its own ignore rule, and
 a new tool arrives without one.
 
-This plugin moves them out. It is two hooks and two scripts, no skills and no
-commands, so installing it changes exactly one thing: where worktrees land.
+This plugin moves them out. It is two hooks and the scripts behind them, no
+skills and no commands, so installing it changes exactly one thing: where
+worktrees land.
 
 ## What the plugin does
 
@@ -31,6 +32,38 @@ component, so two clones that happen to share a name, a personal `api` and a
 work `api`, never share a container. The container is created on demand and
 removed again when its last worktree goes, so it exists only while it holds
 something.
+
+### Names and branches
+
+Everything but the location is Claude Code's own. The directory is the name
+with every `/` turned into `+`, so `feat/hooks` is `feat+hooks`, one level
+deep, and the branch is that with `worktree-` in front: `worktree-feat+hooks`.
+A worktree Claude Code made before the plugin was installed is named the same
+way, which is how the hook finds it again, and asking for a name that happens to
+match a branch you already have, `main` for one, makes `worktree-main` rather
+than landing on `main`.
+
+The name itself is held to Claude Code's rule too: at most 64 characters, in
+`/`-separated segments of letters, digits, dots, underscores and dashes, none of
+them empty, `.` or `..`, or `.git`. Claude Code checks this before it calls the
+hook, and the hook checks it again, because the name becomes a path: an empty
+one would make the container itself the worktree.
+
+### Repositories with no main worktree to find
+
+A bare repository has no main worktree, and one cloned with
+`--separate-git-dir` has one that nothing in its git directory points back to:
+it can be found from inside it, and from a linked worktree not at all. For
+both, the container is keyed on the git directory itself, `<git dir>.worktrees`,
+which every worktree of the repository agrees on. Its parent folder would not
+do, since every repository kept in the same folder would share it:
+
+```text
+~/src/
+  proj.git/                 a bare repository
+  proj.git.worktrees/
+    feat-hooks/
+```
 
 ### The exception: submodules and nested clones
 
@@ -78,7 +111,7 @@ is read instead: counting it as no remote at all would fall through to local
 
 `<remote>/HEAD` is a local record of that default. `git clone` writes it; a
 remote added by hand does not, and reading it back needs the network. So there
-are four cases, not two:
+are more cases than two:
 
 - `<remote>/HEAD` is set. The branch starts there.
 - There are no remotes at all. The branch starts from local `HEAD`, which is
@@ -89,6 +122,16 @@ are four cases, not two:
   the fix, `git remote set-head <remote> --auto`. Starting from local `HEAD`
   here would root a supposedly fresh worktree in whatever the main worktree
   happens to have checked out, and nothing in the output would say so.
+- `<remote>/HEAD` names a branch that no longer exists, which is what a default
+  renamed upstream and then pruned locally leaves behind. The hook fails the
+  same way and names the same fix.
+
+A bare repository is the exception to refusing. A bare clone keeps no
+remote-tracking branches at all, so `<remote>/HEAD` is never recorded: its own
+branches are the remote's, and its own `HEAD` is the remote's default as the
+clone found it. Nothing is checked out in a bare repository for that `HEAD` to
+have drifted to, so wherever a remote records no default, a bare repository's
+`HEAD` stands in for it.
 
 The new branch does not track its base. Tracking `origin/main` would make `git
 push` refuse for want of a matching upstream branch, make `git pull` merge the
@@ -98,18 +141,21 @@ ahead and behind against the wrong branch.
 ### Resuming a name already in use
 
 Claude Code resumes a worktree by asking for its name again, so a name already
-in use has to come back as a path rather than an error. Two things count as in
-use:
+in use has to come back as a path rather than an error. Claude Code resumes by
+path, and so does the hook, at two paths only:
 
-- A worktree registered at the path this hook would have picked.
-- A worktree somewhere else with that branch checked out. This is what a
-  worktree created before the plugin was installed looks like, still sitting
-  at `<repo>/.claude/worktrees/<name>`. git would refuse it as `already used
-  by worktree at`, so the hook returns where it actually is instead. The main
-  worktree never counts, so asking for a worktree named after the branch
-  checked out there is still git's error to give.
+- The path this hook would have picked.
+- The path Claude Code's own layout gives the name,
+  `<repo>/.claude/worktrees/<name>`. This is where a worktree made before the
+  plugin was installed is still sitting, and it is resumed there.
 
-Both come from git's registry, checked against the disk. A directory alone is
+A worktree anywhere else is never handed back, even one on the right
+`worktree-` branch. It is one you made yourself, and the session would be
+working in it, with removal offered for it at the end. When such a worktree
+holds the branch, git would not check it out a second time anyway, so the hook
+refuses by name, saying where it is. The main worktree counts the same way.
+
+Both paths come from git's registry, checked against the disk. A directory alone is
 not a worktree, and a registration whose directory has been deleted is not one
 either. git calls the second prunable and goes on refusing to check that branch
 out anywhere else until it is cleared, so the hook clears it and then creates
@@ -120,13 +166,45 @@ The disk is what tells those apart, rather than the `prunable` annotation in
 than the version this plugin asks for. Reading it below 2.36 would make a
 deleted worktree look live and hand back a path that does not exist.
 
+### Locks
+
+Claude Code locks the worktrees it makes with `git worktree lock`, giving a
+reason that names the session's process, `claude session <name> (pid <n>)`, and
+unlocks them when the session ends. A worktree made before the plugin was
+installed can still carry that lock, left by a session that did not end
+cleanly. Both hooks treat a lock as Claude Code treats it:
+
+- A lock in Claude Code's form whose process is gone is stale. It is broken and
+  the hook carries on, as Claude Code itself would.
+- A lock in Claude Code's form whose process is still running belongs to a
+  session using the worktree. The hook refuses and names the process.
+- Any other lock, with a reason of its own or none at all, is someone's claim
+  on the worktree. The hook refuses and names `git worktree unlock` as the way
+  past it.
+
+Nothing is forced past a lock. git's `remove -f -f` would do that, and would
+delete a worktree another session is working in.
+
+Resuming is the exception, and deliberately so: the create hook hands back a
+worktree whatever its lock says. Claude Code does the same with its own. A
+session that finds a worktree locked by another running session enters it as
+a guest, leaving the lock where it is, rather than refusing it.
+
 ### Removing
 
 `WorktreeRemove` runs [`bin/worktree-remove`](../bin/worktree-remove) when a
 session leaves a worktree it was told to remove. The worktree goes, forced, so
 uncommitted changes in it do not block the removal. Claude Code asks before
 choosing removal, and this hook runs after that answer. The branch stays,
-because an unmerged branch is cheap to keep and expensive to lose.
+because an unmerged branch is cheap to keep and expensive to lose. A lock stops
+the removal, as [Locks](#locks) describes.
+
+Only a worktree in one of the two containers is removed: `<key>.worktrees`, or
+`<repo>/.claude/worktrees`. The hook is only ever handed back a path the create
+hook gave out, so anything else at the path is not something either of them
+made, and a forced removal would take its work with it. The hook refuses it
+and leaves it where it is. The container goes when its last worktree does, and
+nothing above it: for the nested layout that is the project's own `.claude`.
 
 A directory that is already gone is not the no-op it looks like. Its
 registration outlives it, and git keeps refusing to check that branch out
@@ -142,10 +220,12 @@ the branch.
 
 - `jq`, to read the hook event from stdin.
 - git 2.31 or newer, for `rev-parse --path-format`.
+- `ps`, to tell whether the process named in a Claude Code lock is still
+  running.
 
-Neither is checked for, and nothing else is guarded that git already refuses.
-A missing tool, an occupied directory, a main worktree passed for removal:
-each fails the hook, reported in git's or jq's own words. A failed
+None is checked for, and little else is guarded that git already refuses. A
+missing tool or an occupied directory fails the hook, reported in git's or
+jq's own words; the refusals above are the hook's own. A failed
 `WorktreeCreate` hook blocks worktree creation entirely. See [Turning the
 plugin off](#turning-the-plugin-off).
 
@@ -188,7 +268,11 @@ Switching from this session is limited to worktrees managed by Claude Code
 It applies whenever the calling session is itself in a worktree, so with this
 plugin installed, switching between sibling worktrees is refused; entering one
 from an ordinary session is not affected, and neither is creating one. Open the
-worktree as its own session instead. Verified against Claude Code 2.1.267.
+worktree as its own session instead. Verified against Claude Code 2.1.273.
+
+The names, the resume rule, and the lock format above are Claude Code's own,
+read from the same release. They are not documented, so a release that changes
+them changes what this plugin has to match.
 
 ## Turning the plugin off
 
