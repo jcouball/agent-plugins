@@ -81,12 +81,10 @@ The rest of this guide explains the choices. This is the order to make them in.
    effect, assert on the state it changed. Use a mock only when the message to a
    collaborator is the behavior and nothing in the process records it. See
    [Verification](#verification).
-3. **Doubles.** Under the default solitary school, stub every non-trivial
-   collaborator with a verifying double. Under the sociable school, if the project's
-   override file chooses it, use real in-process collaborators and double only what
-   is slow, non-deterministic, or outside the process. Either way, pass strings,
-   hashes, and other plain values as they are, and reach for a fake when the
-   collaborator's state is what the test reads. See [Test doubles](#test-doubles)
+3. **Doubles.** Stub every non-trivial collaborator with a verifying double. Pass
+   strings, hashes, and other plain values as they are, and reach for a fake when the
+   collaborator's state is what the test reads. This is the solitary school, the only
+   one this guide documents. See [Test doubles](#test-doubles)
    and [Unit tests](#unit-tests).
 4. **Cases.** One example per conditional path, chosen by equivalence class and
    boundary. If the input space is large and structured, consider a property. If the
@@ -251,9 +249,7 @@ the real collaborator returns, and a verifying double checks only that the metho
 exists, not what it returns. Rainsberger calls the unit tests collaboration tests and
 the tests that confirm their stubs contract tests; one integration test per stubbed
 return shape is what keeps a solitary unit suite honest. Without it, a stub can
-describe a value the collaborator never produces while both suites stay green. Under
-the sociable school there are fewer stubs, and this reason applies only to the doubles
-that remain.
+describe a value the collaborator never produces while both suites stay green.
 
 **What it proves.** That the layers in the path agree with each other and with the
 real dependency at the end. It does not prove each layer's conditional paths; that is
@@ -270,38 +266,35 @@ paying the integration-test cost.
 ### Unit tests
 
 **Definition.** A unit test exercises one unit, a class or module, through its public
-interface, with collaborators doubled as the unit test school in force requires.
+interface, with its non-trivial collaborators doubled.
 
 Two schools disagree about the doubling, and Fowler names the styles. A solitary unit
-test replaces every collaborator with a double; this is the London or mockist school.
+test replaces every non-trivial collaborator with a double; this is the London or
+mockist school.
 A sociable unit test uses real in-process collaborators and doubles only what is
 slow, non-deterministic, or outside the process; this is the classical or Detroit
 school. Khorikov argues for sociable tests, because doubles for in-process
 collaborators couple the test to the implementation.
 
-The default in this guide is solitary. A suite that must prove every conditional path
+This guide documents solitary unit tests. A suite that must prove every conditional path
 in every unit needs failures that point at one unit, and a sociable test spreads a
 failure across every class in the call chain. The cost is the coupling Khorikov
 describes, and the [Verification](#verification) dimension limits it by reserving
 mocks for messages that are the behavior under test.
 
-**Unit test school** is the override point. A project that chooses sociable tests
-states it in its override file, and the entries that depend on the school, marked
-below and under [Choosing a test](#choosing-a-test) and
-[Integration tests](#integration-tests), say what changes. Nothing else in this guide
-depends on the choice.
+**Sociable unit tests are not documented.** They are named here so the choice is made
+knowingly. Every rule about doubles in this guide, and in the standards skills built on
+it, assumes a solitary test. A project that chooses sociable tests writes that guidance
+itself.
 
 **Real and doubled.** The unit under test is real. Verifying stubs replace
 non-trivial collaborators, meaning anything with behavior worth testing on its own. A
 mock replaces a collaborator only when the message to it is the behavior under test,
-as the [Verification](#verification) dimension explains. Trivial values such as
-strings, hashes, arrays, and other standard library objects with no behavior of their
-own are passed in as they are; doubling them adds noise without adding isolation. No
+as the [Verification](#verification) dimension explains. Trivial values are passed in
+as they are: strings, hashes, arrays, and other standard library objects with no
+behavior of their own, and value objects, immutable and free of IO, such as a `Money`
+or a date range. Doubling them adds noise without adding isolation. No
 external state: no filesystem, no subprocess, no network, no clock.
-
-Under the sociable school, real in-process collaborators take the place of the stubs.
-Doubles remain for anything slow, non-deterministic, or outside the process, and the
-rules on trivial values and external state are unchanged.
 
 **When to choose it.** For every conditional path in the unit. This is the default
 scope, and the question "which scope should this test be" starts here. It moves

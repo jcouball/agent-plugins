@@ -30,9 +30,9 @@ is the default; override it when a clearer test requires it, and say so in a com
 ## Step 0: Apply project overrides
 
 A project may carry its own thin copy of this skill holding only its local changes and
-additions: where its unit specs live, how its coverage gate is configured, which unit
-test school it follows, which rules it flips, and its own conventions for particular
-class families. Check for one at each of these paths and use the first that exists:
+additions: where its unit specs live, how its coverage gate is configured, which rules
+it flips, and its own conventions for particular class families. Check for one at each
+of these paths and use the first that exists:
 
 - `.claude/skills/rspec-unit-testing-standards/SKILL.md`
 - `.github/skills/rspec-unit-testing-standards/SKILL.md`
@@ -112,10 +112,9 @@ Stub anything whose real involvement would cross the unit boundary: a subprocess
 filesystem, the network, the clock, or another class with behavior of its own. Do
 not stub strings, numbers, arrays, hashes, or a value object with no IO. The
 question is whether running the real thing would stop this being a unit test. This
-is the solitary school, which the guide makes the default and names as the project's
-override point. Where an override declares the sociable school, in-process
-collaborators run real and this rule covers only what leaves the process.
-Guide: [Unit tests](../../docs/testing-guide.md#unit-tests), real and doubled.
+is the solitary school. Sociable unit tests, which run in-process collaborators for
+real, are not documented here or in the guide. Guide:
+[Unit tests](../../docs/testing-guide.md#unit-tests), real and doubled.
 
 ## Coverage
 
