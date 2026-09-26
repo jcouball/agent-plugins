@@ -178,15 +178,19 @@ such as contract tests and acceptance tests, use it too.
 
 ### System tests
 
-**Definition.** A system test drives the whole application from the outside, the way
-a user or a calling process would. For a library, it calls the public API against
-real external state and asserts on the resulting state. Rails and ISTQB say system
+**Definition.** A system test drives the whole application from the outside, the way a
+user or a calling process would. For a library, it performs a workflow through the
+public API, several calls in the order a user makes them, against real external state,
+and asserts on the resulting state. One public method checked against a real dependency
+is an integration test, however much of the library it runs. Rails and ISTQB say system
 test; Fowler, Khorikov, and most writing about web applications say end-to-end test.
 They mean the same thing.
 
 **Real and doubled.** Everything is real: every class, every dependency, the
 database, the filesystem, the network, the browser or the command-line entry point.
-Nothing is doubled.
+Nothing in the application is doubled. A third-party service the team does not run,
+such as a payment provider, is the usual exception: a sandbox or a fake replaces it at
+the network edge, and what the replacement fakes is not proved.
 
 **When to choose it.** When the question is "does the shipped software do the job",
 and no narrower test can answer it because the behavior depends on how all the pieces
@@ -764,9 +768,11 @@ per-type sections above do not repeat them.
   reader trusts when the example is collapsed or listed in a failure report.
 - **Error assertions without a message pattern.** Checking the class alone lets a
   different failure with the same class pass. Match the class and a message pattern.
-- **Committed skip or focus markers.** An unconditional pending example that never
-  gets un-pended is a test that silently stopped running. A focus marker that reaches
-  the main branch turns off the rest of the suite. Both are review findings, not
+- **Committed skip or focus markers.** An unconditional skip, an `x`-prefixed example,
+  or an example with no body is a test that silently stopped running. A committed
+  `pending` still runs, and fails once the code starts working, but it keeps a known
+  failure in the suite that belongs in the issue tracker. A focus marker that reaches
+  the main branch turns off the rest of the suite. All three are review findings, not
   style. A guard that skips on a stated condition, such as a dependency older than the
   feature under test, is not one of these: it names why it skipped and it runs
   everywhere the condition holds.
@@ -989,10 +995,10 @@ smell is a question.
 
 #### RSpec smells
 
-- **Deep nesting.** Contexts more than three levels deep, where the reader has to
-  scroll up through several `let` overrides to know what the subject is. Usually a
-  sign the class has too many collaborators. Legitimate for a method with a wide
-  input space.
+- **Deep nesting.** Groups more than three levels deep, counting the top-level
+  `describe`, where the reader has to scroll up through several `let` overrides to know
+  what the subject is. Usually a sign the class has too many collaborators. Legitimate
+  for a method with a wide input space.
 - **`let!` as a hidden fixture.** A `let!` at the top of a file is a General Fixture
   that runs for every example. Legitimate when every example needs the side effect.
 - **Iterated expectations.** `each` over a collection with an `expect` inside, so a
@@ -1047,6 +1053,16 @@ Capybara, using either the fast `rack_test` driver or a real browser driver.
 `rspec-rails` calls them system specs when they build on Rails' `SystemTestCase` and
 feature specs when they use Capybara directly.
 
+A system spec reads as the journey it proves. Its file is named for the feature, so a
+reader looking for how checkout is tested finds `checkout_spec.rb` rather than a file
+named for a controller the journey happens to cross. It finds elements the way a user
+does: by the text of a button or link, the label of a field, or a landmark. A selector
+tied to a CSS class or to the page's structure breaks when the design changes and the
+behavior does not, and a test that fails with no change in behavior teaches the team
+to ignore its failures. Each example is one scenario, so a failure names the journey
+that broke, and an expectation partway through is a step of that journey rather than a
+second test.
+
 ### Job specs
 
 Job specs test an ActiveJob class either by performing it inline and asserting on the
@@ -1099,8 +1115,15 @@ assert on the files it creates.
 
 - **`sleep` in system specs.** Capybara's finders and matchers wait; a `sleep` is a
   race with a timeout.
-- **Stubbing `Time.now`.** `travel_to` from `ActiveSupport::Testing::TimeHelpers`
-  also covers `Time.current` and `Date.today`, and restores itself.
+- **Stubbing `Time.now`.** A stub of `Time.now` misses `Time.current` and
+  `Date.today`, so code that reads them runs on the real clock. `travel_to` from
+  `ActiveSupport::Testing::TimeHelpers` covers all three. Its block form,
+  `travel_to(time) { ... }`, or `around { |example| travel_to(time) { example.run } }`
+  for a whole group, restores the clock when the block ends. A bare call is undone
+  only by Rails' test lifecycle, which rspec-rails runs only in Rails-typed example
+  groups, so anywhere else the stubbed clock leaks into later examples. rspec-rails
+  does not include the helpers, so the RSpec config needs
+  `config.include ActiveSupport::Testing::TimeHelpers`.
 - **Transactional tests across a browser process.** A system spec where the app
   server cannot see rows the test inserted, or the reverse. Rails handles the default
   case; it reappears with custom database cleaning.

@@ -1,11 +1,14 @@
 ---
 name: rspec-unit-testing-standards
-description: 'Rules for RSpec unit specs, on top of the scope-neutral rspec-base-standards skill it loads first: the examples a constructor earns, requiring only the spec helper and the file under test, keeping setup in the file, stubbing every non-trivial collaborator, the coverage gate, determinism, and leaving process and global state alone. Use when writing, reviewing, or auditing an RSpec unit spec, or deciding what a unit spec may stub. If the current project has its own rspec-unit-testing-standards skill, that file holds project-specific changes and additions: still apply this skill, and apply those changes on top (Step 0).'
+description: 'Rules for RSpec unit specs, on top of the scope-neutral rspec-base-standards skill it loads first: the examples a constructor earns, requiring only the spec helper and the file under test, keeping setup in the file, stubbing every non-trivial collaborator, the coverage gate, determinism, leaving process and global state alone, testing mixins and module functions, and the Rails helper, mailer, job, routing, view, and channel specs. Use when writing, reviewing, or auditing an RSpec unit spec, or deciding what a unit spec may stub. If the current project has its own rspec-unit-testing-standards skill, that file holds project-specific changes and additions: still apply this skill, and apply those changes on top (Step 0).'
 ---
 
 # RSpec unit testing standards
 
-What a unit spec requires beyond the conventions every spec follows. Load the
+What a unit spec requires beyond the conventions every spec follows. A unit is a
+class, a module mixed into a host, a module of functions, or, in a Rails app, a
+component the guide's [Rails spec types](../../docs/testing-guide.md#rails-spec-types)
+table puts at unit scope. Load the
 [RSpec base standards](../rspec-base-standards/SKILL.md) first and apply it in full:
 this skill adds the rules that exist because the spec is a unit spec, and overrides
 nothing in it. Each rule is one sentence with a priority word, an example where one
@@ -23,6 +26,7 @@ is the default; override it when a clearer test requires it, and say so in a com
 - [Doubles](#doubles)
 - [Coverage](#coverage)
 - [Reliability](#reliability)
+- [Modules and Rails components](#modules-and-rails-components)
 - [What the tools check](#what-the-tools-check)
 - [Verification](#verification)
 - [Output](#output)
@@ -70,19 +74,25 @@ Then, for each unit spec written or reviewed:
    three or more files (Rule 3).
 4. Every non-trivial collaborator is stubbed, and trivial values are passed as they
    are (Rule 4).
-5. The unit suite alone covers every line and branch of the class (Rule 5).
+5. The unit suite alone covers every line and branch of the unit (Rule 5).
 6. No real time, randomness, sleep, or external process timing, and no change to
    `ENV`, the working directory, or any global (Rules 6, 7).
+7. A mixin is tested through a host, and module functions are called on the module
+   (Rules 8, 9).
+8. A Rails component is driven by its rspec-rails harness (Rule 10).
 
 ## Structure and setup
 
 ### Rule 1 (SHOULD): `#initialize` gets a group when a public reader can see what it stored
 
+A module has no constructor, and this rule does not apply to it.
+
 A constructor gets a `describe '#initialize'` group with one `have_attributes` example
 when a public reader can observe what it stored, and one example per branch instead when
-it validates or branches. A concrete class that callers instantiate but that does not
-override `#initialize` still gets the group, in the one-example form, so the spec
-documents the constructor and catches an accidental override. There is nothing to write
+it validates or branches. A concrete class that inherits a constructor which stores its
+arguments, such as a subclass of a base class that takes them, still gets the group, in
+the one-example form, so the spec documents the constructor and catches an accidental
+override. There is nothing to write
 when no public reader can see the stored value: the shared rule on testing through the
 public interface forbids reaching past it, the methods that use the value cover it, and
 a reader added for the spec alone is the guide's Test logic in production code
@@ -93,7 +103,9 @@ tests](../../docs/testing-guide.md#class-unit-tests).
 ### Rule 2 (MUST): Require the spec helper and the file under test, nothing else
 
 Every other require couples the spec to code it does not test, so a rename elsewhere
-breaks it. Guide:
+breaks it. In a Rails app the spec helper is `rails_helper`, which loads the
+application, and the autoloader supplies the file under test, so the spec requires
+`rails_helper` alone. Guide:
 [Class unit tests](../../docs/testing-guide.md#class-unit-tests).
 
 ### Rule 3 (SHOULD): Keep setup in the spec file; share only substantial setup
@@ -134,17 +146,11 @@ tests](../../docs/testing-guide.md#unit-tests), what it proves.
 ### Rule 6 (MUST): Unit specs are deterministic
 
 No real time, randomness, sleep, or external process timing. In a Rails app, set the
-time with the block form of `travel_to`, `travel_to(time) { ... }`, or with
-`around { |example| travel_to(time) { example.run } }` for a whole group. It covers
-`Time.now`, `Time.current`, and `Date.today`, and restores them when the block ends. A
-bare `travel_to` is undone only by Rails' test lifecycle, which rspec-rails runs only in
-Rails-typed groups, so in any other group the stubbed clock leaks into later examples. A
-stub of `Time.now` alone leaves code that reads `Date.today` on the real clock.
-`travel_to` comes from `ActiveSupport::Testing::TimeHelpers`, which rspec-rails does not
-include, so the RSpec config needs `config.include ActiveSupport::Testing::TimeHelpers`.
-Elsewhere, inject the clock, or stub `Time.now` and `Process.clock_gettime` on their
-receivers. Stub `SecureRandom` on its receiver. `rand` has no receiver to stub: it is a
-private `Kernel` method, so stubbing it stubs the subject, which the shared rules
+time with the block form of `travel_to`, or an `around` hook that wraps the example in
+it, never a bare call, with `ActiveSupport::Testing::TimeHelpers` included in the RSpec
+config. Elsewhere, inject the clock, or stub `Time.now` and `Process.clock_gettime` on
+their receivers. Stub `SecureRandom` on its receiver. `rand` has no receiver to stub: it
+is a private `Kernel` method, so stubbing it stubs the subject, which the shared rules
 forbid, and seeding it with `srand` changes global state (Rule 7). Give the subject a
 `Random` parameter that defaults to `Random.new` and pass
 `instance_double(Random, rand: 3)` from the spec, which names the value the example
@@ -158,8 +164,64 @@ depends on. Guide: [Non-determinism](../../docs/testing-guide.md#test-anti-patte
 the value; a subject that reads a global directly usually wants a parameter that
 defaults to it. When the code under test exists to read that state and has no seam,
 change it inside an `around` hook that restores it even on failure, comment why, and
-note that restoring does nothing for other threads, so a seam is the follow-up.
-Guide: [Mutating process or global state](../../docs/testing-guide.md#test-anti-patterns).
+note that restoring does nothing for other threads, so a seam is the follow-up. Faking
+the clock is not the state this rule means: a stub made with rspec-mocks, or the block
+form of `travel_to`, is undone by the framework when the example ends. A subject that
+starts threads of its own takes the clock as a parameter instead, because a faked clock
+is visible to every thread in the process while it lasts. Guide: [Mutating process or
+global state](../../docs/testing-guide.md#test-anti-patterns).
+
+## Modules and Rails components
+
+### Rule 8 (MUST): Test a mixin through a host object
+
+```ruby
+RSpec.describe Billing::Roundable do
+  let(:host) do
+    mixin = described_class
+    Class.new { include mixin }.new
+  end
+
+  describe '#rounded' do
+    subject(:rounded) { host.rounded(10.456) }
+```
+
+Use an anonymous host, as above, unless the module calls methods its includer must
+provide; then use a real includer. Assert only on what the mixin adds: the host's own
+behavior belongs to the host's spec. For a Rails helper, the `helper` object
+rspec-rails provides is the host. Guide: [Module and mixin unit
+tests](../../docs/testing-guide.md#module-and-mixin-unit-tests).
+
+### Rule 9 (MUST): Call module functions on the module
+
+```ruby
+RSpec.describe Billing::Rounding do
+  describe '.half_even' do
+    subject(:result) { described_class.half_even(2.5) }
+```
+
+A method defined with `def self.` or `module_function` is called on the module and
+grouped under `.name`, never reached through an includer. State the module keeps
+between calls is global state, which Rule 7 leaves alone; functions that need it want
+to be a class. Guide: [Module method unit
+tests](../../docs/testing-guide.md#module-method-unit-tests).
+
+### Rule 10 (SHOULD): Drive a Rails component with its rspec-rails harness
+
+| Spec type | Subject | Action | Assert on |
+| --- | --- | --- | --- |
+| Helper | The helper module | Call the method on `helper` | Its return value |
+| Mailer | The mailer class | Build the message; never deliver it | Its recipients, subject, and body |
+| Job | The job class | `perform_now`, or `perform_later` when enqueuing is the behavior | The result, or `have_been_enqueued` |
+| Routing | The controller class | None: the path and verb are the input | `route_to` and `be_routable` |
+| View | The template path | `assign` the inputs, then `render` | `rendered` |
+| Channel | The channel class | `subscribe`, then `perform` | `subscription` and `have_broadcasted_to` |
+
+Each harness runs the one component without the rest of the application, which is what
+keeps these specs at unit scope. Model, request, controller, and generator specs run
+real collaborators and follow the
+[integration standards](../rspec-integration-testing-standards/SKILL.md). Guide:
+[Rails spec types](../../docs/testing-guide.md#rails-spec-types).
 
 ## What the tools check
 
@@ -174,7 +236,7 @@ After writing or changing a spec:
 
 1. Run the spec file while writing it. Step 2 runs it again as part of the suite,
    so this is the fast inner loop and not a separate signal.
-2. Confirm coverage of the class under test is complete. The project override
+2. Confirm coverage of the unit under test is complete. The project override
    names the command that fails below the gate; without one, run the unit specs
    alone with SimpleCov, so no integration example masks a gap, and read the file's
    line and branch figures in the report. SimpleCov measures lines only until its
