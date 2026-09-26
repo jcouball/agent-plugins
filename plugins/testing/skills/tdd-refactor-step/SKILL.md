@@ -135,10 +135,11 @@ the standards for the kind of spec being refactored: a unit spec follows the
 [unit standards](../rspec-unit-testing-standards/SKILL.md) on top of them, and an
 integration spec follows the shared standards and the
 [integration standards](../rspec-integration-testing-standards/SKILL.md),
-which overrides several unit rules for it. Load that skill and run its Step 0 before
-touching an integration spec: the unit rules on requires, shared contexts, and
-stubbing every collaborator are the ones it overrides, and applying them would
-remove the seam the spec exists to test.
+which overrides several unit rules for it; a system spec follows the shared standards
+and the [system standards](../rspec-system-testing-standards/SKILL.md). Load the
+scope's skill and run its Step 0 before touching an integration or system spec: the
+unit rules on requires, shared contexts, and stubbing every collaborator do not apply
+there, and applying them would remove what the spec exists to test.
 
 | Smell | Technique |
 | --- | --- |

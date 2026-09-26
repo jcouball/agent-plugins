@@ -144,9 +144,10 @@ first; it changes no assertion.
 
 Any change to a spec follows the
 [RSpec base standards](../rspec-base-standards/SKILL.md) and then the standards for
-its kind, the [unit](../rspec-unit-testing-standards/SKILL.md) or the
-[integration](../rspec-integration-testing-standards/SKILL.md) one. Those two differ on
-what a spec may stub and require, so load the right one and run its Step 0 before
+its kind, the [unit](../rspec-unit-testing-standards/SKILL.md),
+[integration](../rspec-integration-testing-standards/SKILL.md), or
+[system](../rspec-system-testing-standards/SKILL.md) one. They differ on what a spec
+may stub and require, so load the right one and run its Step 0 before
 editing. An integration spec's external process runs on its own clock, which no
 stub reaches, so the determinism row there means asserting nothing that clock
 decides rather than stubbing it.

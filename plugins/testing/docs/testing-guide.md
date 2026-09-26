@@ -185,7 +185,9 @@ They mean the same thing.
 
 **Real and doubled.** Everything is real: every class, every dependency, the
 database, the filesystem, the network, the browser or the command-line entry point.
-Nothing is doubled.
+Nothing in the application is doubled. A third-party service the team does not run,
+such as a payment provider, is the usual exception: a sandbox or a fake replaces it at
+the network edge, and what the replacement fakes is not proved.
 
 **When to choose it.** When the question is "does the shipped software do the job",
 and no narrower test can answer it because the behavior depends on how all the pieces
