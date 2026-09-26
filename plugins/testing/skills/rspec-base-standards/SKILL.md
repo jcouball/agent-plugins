@@ -1,13 +1,14 @@
 ---
 name: rspec-base-standards
-description: 'Conventions every RSpec spec follows whatever its scope: the constant in `RSpec.describe`, one `describe` per public method, the spec path, testing through the public interface, `context` and `it` wording, nesting, `subject` and `let`, `allow` and `expect`, verifying doubles, error assertions, edge-case placement, observable behavior, random order, and the forbidden stubbing forms. Load it with the unit or integration standards, which add what their scope needs and override the rest. Use when writing, reviewing, or auditing any RSpec spec. If the current project has its own rspec-base-standards skill, that file holds project-specific changes and additions: still apply this skill, and apply those changes on top (Step 0).'
+description: 'Conventions every RSpec spec follows whatever its scope: naming the subject in `RSpec.describe`, one `describe` per method or endpoint, the spec path, testing through the public interface, `context` and `it` wording, nesting, `subject` and `let`, `allow` and `expect`, verifying doubles, error assertions, edge-case placement, observable behavior, random order, and the forbidden stubbing forms. Load it with the unit, integration, or system standards, which add what their scope needs and override the rest. Use when writing, reviewing, or auditing any RSpec spec. If the current project has its own rspec-base-standards skill, that file holds project-specific changes and additions: still apply this skill, and apply those changes on top (Step 0).'
 ---
 
 # RSpec base standards
 
 The conventions every RSpec spec follows, whatever it tests. The
-[unit](../rspec-unit-testing-standards/SKILL.md) and
-[integration](../rspec-integration-testing-standards/SKILL.md) standards each load
+[unit](../rspec-unit-testing-standards/SKILL.md),
+[integration](../rspec-integration-testing-standards/SKILL.md), and
+[system](../rspec-system-testing-standards/SKILL.md) standards each load
 this skill and add the rules their scope needs; where one of them overrides a rule
 here, it says so. Each rule is one sentence with a priority word, an example where one
 helps, and, where the guide reasons about it, a link to the paragraph of the
@@ -59,16 +60,17 @@ If no override exists, run this skill as written.
 
 In order, for every spec written or reviewed, whatever its scope:
 
-1. One `RSpec.describe` per class with the constant, `described_class` inside,
-   `# frozen_string_literal: true` at the top, one `describe` per public method, and
-   a path mirroring the source (Rules 1 to 4, 6).
+1. One `RSpec.describe` naming the subject, with the constant when the subject is
+   Ruby code; `described_class` inside; `# frozen_string_literal: true` at the top;
+   one `describe` per method or endpoint; and a path that follows from the subject
+   (Rules 1 to 4, 6).
 2. Nothing reached except through the public interface: no `send`, `__send__`, or
    `instance_variable_get` (Rule 5).
 3. `context` descriptions start with when, with, or without; each `it` asserts one
    concept and says what it asserts (Rules 7, 8).
 4. `describe`, then `context`, then `it`, no deeper than three levels (Rule 9).
-5. A named `subject` first, the `let` inputs after it, a `context` overriding only
-   the input its condition is about (Rules 10 to 13).
+5. Where the subject is Ruby code, a named `subject` first, the `let` inputs after
+   it, a `context` overriding only the input its condition is about (Rules 10 to 13).
 6. `change` and `raise_error` matchers over before-and-after assertions; `let` for
    every value and `before` only for side effects (Rules 14, 15).
 7. `allow` unless the message is the behavior under test, then `expect`; verifying
@@ -85,33 +87,52 @@ scope requires and says which of these rules it overrides.
 
 ## Structure
 
-### Rule 1 (MUST): One top-level `RSpec.describe` per class, using the constant
+A spec's subject is what its top-level group names. Usually it is Ruby code: a class,
+a module mixed into a host, or a module of functions. In some Rails spec types it is
+not: an endpoint in a request spec, a template in a view spec, and a user workflow in a
+system spec. Rules 1, 2, 4, and 6 say what each kind of subject takes, and Rules 10 to
+13 hold only where the subject is Ruby code.
+
+### Rule 1 (MUST): One top-level `RSpec.describe` per file, naming the subject
 
 ```ruby
-RSpec.describe Billing::Invoice do   # never RSpec.describe 'Billing::Invoice'
+RSpec.describe Billing::Invoice do               # Ruby code: the constant
+RSpec.describe '/invoices', type: :request do    # endpoints: the resource path
+RSpec.describe 'invoices/show', type: :view do   # a template: its path
+RSpec.describe 'Checkout', type: :system do      # a workflow: the feature
 ```
 
-A string loses `described_class` and the load-time detection of a typo in the
-constant. Guide: [Class unit tests](../../docs/testing-guide.md#class-unit-tests).
+When the subject is Ruby code, use the constant, never a string: a string loses
+`described_class` and the load-time detection of a typo in the constant. A Rails spec
+carries its `type` unless the project infers it from the directory. Guide: [Class unit
+tests](../../docs/testing-guide.md#class-unit-tests) and [Rails spec
+types](../../docs/testing-guide.md#rails-spec-types).
 
-### Rule 2 (MUST): One `describe` per public method, prefixed `#` or `.`
+### Rule 2 (MUST): One `describe` per method or endpoint
 
 ```ruby
-describe '#total' do ... end
-describe '.from_order' do ... end
+describe '#total' do ... end         # instance method
+describe '.from_order' do ... end    # class or module method
+describe 'POST /invoices' do ... end # endpoint, under its resource
 ```
 
 The constructor is not a public method for this rule; the unit standards say when it
-gets a group of its own. Guide: [Class unit tests](../../docs/testing-guide.md#class-unit-tests).
+gets a group of its own. A subject with one entry point, such as a template, puts its
+`context` groups directly under the top-level group, and the system standards say how a
+workflow's examples are grouped. Guide: [Class unit
+tests](../../docs/testing-guide.md#class-unit-tests).
 
 ### Rule 3 (SHOULD): `# frozen_string_literal: true` at the top of every spec
 
 Mechanical: Style/FrozenStringLiteralComment enforces it where rubocop runs.
 
-### Rule 4 (MUST): The spec path mirrors the source path
+### Rule 4 (MUST): The spec path follows from the subject
 
-`lib/billing/invoice.rb` is tested by `.../billing/invoice_spec.rb`, under whichever
-spec root the scope's standards name. Guide: [Class unit tests](../../docs/testing-guide.md#class-unit-tests).
+For Ruby code it mirrors the source path: `lib/billing/invoice.rb` is tested by
+`.../billing/invoice_spec.rb`, under whichever spec root the scope's standards name.
+Any other subject sits in its spec type's directory, named for the subject:
+`spec/requests/invoices_spec.rb`, `spec/views/invoices/show.html.erb_spec.rb`,
+`spec/system/checkout_spec.rb`. Guide: [Class unit tests](../../docs/testing-guide.md#class-unit-tests).
 
 ### Rule 5 (MUST): Test only through the public interface
 
@@ -124,7 +145,7 @@ public, or split the public method. Guide:
 
 ## Naming and organization
 
-### Rule 6 (SHOULD): Use `described_class` inside the describe block
+### Rule 6 (SHOULD): Use `described_class` inside a group that names a constant
 
 Mechanical: RSpec/DescribedClass enforces it where rubocop-rspec runs.
 
@@ -162,6 +183,11 @@ A method with one path and no conditions worth naming puts `it` directly under
 [Deep nesting](../../docs/testing-guide.md#rspec-smells).
 
 ## Setup and subject
+
+Rules 10 to 13 name the return value of a method, so they hold where the subject is Ruby
+code. In a request or view spec, the request or the `render` is the action: put it in
+a `before` in the group its examples share, and assert on `response` or `rendered`.
+The system standards say where a workflow's steps go.
 
 ### Rule 10 (SHOULD): A named `subject` comes first in each `describe #method`
 
@@ -327,6 +353,10 @@ for one top-level group per file), 4 (RSpec/SpecFilePathFormat), 7
 (RSpec/UnspecifiedException), 22 (RSpec/Focus for the focus markers), and 23
 (RSpec/AnyInstance, RSpec/MessageChain, RSpec/SubjectStub). Rules 3 and 6 name their own
 cop in their bodies, and Rule 21 is random ordering.
+
+RSpec/DescribeClass does not ask for a constant where Rule 1 asks for a string: its
+defaults exempt any spec whose `type` metadata names a Rails spec type, and any file
+under `spec/features`, `spec/requests`, `spec/routing`, `spec/system`, or `spec/views`.
 
 Some cops touch a rule without checking it. RSpec/MultipleExpectations counts `expect`
 calls against `Max` and cannot tell one concept from several. The `have_attributes`

@@ -119,7 +119,8 @@ The path an example runs crosses several real classes on its way to the dependen
 the file belongs to the class whose public method the example calls, and it does not
 also exercise the lower classes through their own interfaces. A spec that drives the
 whole application, or a workflow a user performs rather than a method the code
-exposes, is a system test and does not live here. Under each method, group by
+exposes, is a system test and follows the
+[system standards](../rspec-system-testing-standards/SKILL.md). Under each method, group by
 outcome: a `context` for success and a `context` for failure. Guide:
 [Integration tests](../../docs/testing-guide.md#integration-tests), definition.
 
