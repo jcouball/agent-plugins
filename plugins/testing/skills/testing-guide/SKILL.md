@@ -9,6 +9,39 @@ The guide itself is [docs/testing-guide.md](../../docs/testing-guide.md) in this
 plugin. This skill is the door to it: it says when to read the guide, which part to
 read, and how a project layers its own choices on top.
 
+## Contents
+
+- [Step 0: Apply project overrides](#step-0-apply-project-overrides)
+- [When to load the guide](#when-to-load-the-guide)
+- [Which part to read](#which-part-to-read)
+
+## Step 0: Apply project overrides
+
+A project may carry its own thin copy of this skill holding only its local
+changes and additions: which defaults it flips, how its test suite is laid out,
+and which of its own standards derive from the guide. Check for one at each of
+these paths and use the first that exists:
+
+- `.claude/skills/testing-guide/SKILL.md`
+- `.github/skills/testing-guide/SKILL.md`
+
+If neither exists, fall back to searching wherever the project keeps agent skills
+for a `SKILL.md` whose frontmatter `name` is `testing-guide`:
+
+```bash
+grep -rlE --include=SKILL.md "^name: *['\"]?testing-guide['\"]? *$" . \
+  --exclude-dir=node_modules --exclude-dir=vendor --exclude-dir=.git
+```
+
+The name may be quoted or bare, and the anchors keep it from matching a longer
+name. Never treat a vendored or installed copy of this skill itself as the override; a
+full copy holds no project deltas. Read the file found and apply its changes and
+additions, with the project file winning on conflict. If that file is what invoked
+this skill, its changes are already in context; do not re-read it, and do not
+re-invoke anything it names.
+
+If no override exists, run this skill as written.
+
 ## When to load the guide
 
 Read the guide when the question is about terms or reasons:
@@ -30,6 +63,8 @@ for the reasoning.
 The guide is long. Read the section that answers the question, not the whole file.
 
 - Choosing which kind of test to write: **Choosing a test**.
+- What the six dimensions are and how they combine: **Test classification**.
+- Building inputs, fixtures, and factories: **Test data**.
 - Doubles and their names: **Test doubles**.
 - What a kind of test is and what it is for: **Test types**, then the entry.
 - Attributes that vary independently of type: **Test attributes**, then the
@@ -42,19 +77,3 @@ The guide is long. Read the section that answers the question, not the whole fil
 Cite the guide by heading. The headings are an interface: skills and standards
 refer to them, so renaming one is a breaking change to every document that cites
 it.
-
-## Step 0: Apply project overrides
-
-A project may carry its own thin copy of this skill holding only its local
-changes and additions: which defaults it flips, how its test suite is laid out,
-and which of its own standards derive from the guide. Check for one at each of
-these paths and use the first that exists:
-
-- `.claude/skills/testing-guide/SKILL.md`
-- `.github/skills/testing-guide/SKILL.md`
-
-If neither exists, fall back to any other `SKILL.md` in the project whose
-frontmatter `name` is `testing-guide`, never a vendored copy of this skill
-itself. Read the file found and apply its changes and additions, with the project
-file winning on conflict. If that file is what invoked this skill, its changes are
-already in context; do not re-read it, and do not re-invoke anything it names.

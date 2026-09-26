@@ -16,8 +16,11 @@ plugins/<plugin>/
   .claude-plugin/plugin.json        the plugin manifest, declares its skills
   skills/<skill>/SKILL.md           one directory per skill
   commands/<command>.md             one file per slash command
+  docs/<name>.md                    reference the plugin's skills cite and ship
 scripts/                            the checks and the local install helper
 metrics/<report>/                   a report, its data, the script that makes it
+docs/                               working notes for repository-level work in
+                                    progress, shipped by no plugin
 ```
 
 The path names the plugin, the `name` field in `plugin.json` keeps it unique
@@ -87,6 +90,16 @@ Commit messages are conventional commits, checked by the commit-msg hook and
 again in CI. The type is not decoration. `feat` is a minor bump, `fix` is a
 patch, and either a `!` after the type or a `BREAKING CHANGE:` footer is a
 major. Scope the commit to the plugin, skill, or command it touches.
+
+Below 1.0.0 every bump is one step smaller. Each config sets
+`bump-minor-pre-major` and `bump-patch-for-minor-pre-major`, so a breaking
+change proposes a minor and a `feat` proposes a patch until the plugin reaches
+1.0.0. A new plugin adding whole skills under `feat` therefore goes to 0.1.1,
+not 0.2.0. Reaching 1.0.0 is what turns the types back into the bumps above.
+
+A commit that touches no path under `plugins/` belongs to no plugin, whatever
+its scope says, so it reaches no changelog and no release. Keep repository-level
+work in its own commit and give it a scope that does not name a plugin.
 
 One commit, one plugin. release-please attributes a commit to a plugin by the
 paths it touches, not by its scope, and it honors a breaking marker on every
@@ -167,16 +180,24 @@ the manifest without doing either gets 1.0.0.
 npm run ci
 ```
 
-Five checks, each runnable on its own:
+Six checks, each runnable on its own:
 
+- `npm test` runs the tests for the check scripts themselves, with Node's
+  built-in test runner, so the scripts stay free of dependencies. The link
+  check's tests pin each heading-to-anchor case it has got wrong before; add
+  one whenever it gets another wrong.
 - `npm run lint:manifests` compares the marketplace manifest, the plugin
   manifests, and the skills on disk against each other, and fails when a skill
-  is undeclared, a plugin is unlisted, a `SKILL.md` has no description, or
-  `plugin.json` and the plugin's `.release-please/` manifest disagree about a
-  version.
-- `npm run lint:links` resolves every relative markdown link. External URLs are
-  left alone, since the links that rot here are the ones naming files in this
-  repository.
+  is undeclared, a plugin is unlisted, a `SKILL.md` or a `plugin.json` has no
+  description, the marketplace and the plugin manifest describe a plugin
+  differently, or `plugin.json` and the plugin's `.release-please/` manifest
+  disagree about a version.
+- `npm run lint:links` resolves every relative markdown link, and the heading a
+  `#fragment` on one names, so renaming a heading fails the build instead of
+  quietly breaking every document that cites it. External URLs are left alone,
+  since the links that rot here are the ones naming files in this repository. A
+  fragment on a link within one file is left to markdownlint's MD051, which
+  already checks those.
 - `npm run lint:actions` runs actionlint over `.github/workflows/`, which
   catches broken expressions, undefined contexts, bad `runs-on` labels, and
   wrong action inputs before a push finds them.
@@ -224,7 +245,8 @@ an error.
 
 1. Create `plugins/<name>/.claude-plugin/plugin.json`.
 2. Add an entry to the `plugins` array in the marketplace manifest with
-   `"source": "./plugins/<name>"`.
+   `"source": "./plugins/<name>"` and a `description` identical to the one in
+   `plugin.json`; the manifest check compares them.
 3. Create `.release-please/<name>-config.json` and seed its starting version
    in `.release-please/<name>-manifest.json`. Copy an existing pair and
    change the plugin name throughout. The manifest check fails while either

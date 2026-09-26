@@ -2,6 +2,9 @@
 globs:
   - "**/*.md"
 ignores:
-  - node_modules
+  # Anywhere, not just at the root: a git worktree carries its own.
+  - "**/node_modules"
+  # Worktrees live here; their markdown belongs to another branch.
+  - ".claude/**"
   # Written by release-please, not by hand.
   - "plugins/*/CHANGELOG.md"
