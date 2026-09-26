@@ -17,9 +17,8 @@ reasons about it, a link to the paragraph of the
 is the default; override it when a clearer test requires it, and say so in a comment.
 
 The [unit standards](../rspec-unit-testing-standards/SKILL.md) do not apply here. They
-hold the seven rules a spec has because it is a unit spec, and each is replaced at this
-scope; this list is what replaces them, named by subject so a renumbering there cannot
-repoint it:
+hold the rules a spec has because it is a unit spec, and this list says what becomes
+of each at this scope, named by subject so a renumbering there cannot repoint it:
 
 - The constructor's group and its `have_attributes` example do not apply to a
   constructor that only stores its arguments, since it reaches no dependency. One that
@@ -37,6 +36,9 @@ repoint it:
   below, and pins what the process would otherwise take from the machine, per Rule 11
   below. Time and randomness inside the process are still stubbed or injected.
 - Global state is restated as Rule 10 below.
+- Mixins and module functions need no rules of their own: the spec belongs to the
+  class or module whose public method the example calls, per Rule 2 below.
+- The rspec-rails harnesses are for the spec types at unit scope.
 
 This skill states only what differs at integration scope.
 
@@ -121,7 +123,8 @@ The path an example runs crosses several real classes on its way to the dependen
 the file belongs to the class whose public method the example calls, and it does not
 also exercise the lower classes through their own interfaces. A spec that drives the
 whole application, or a workflow a user performs rather than a method the code
-exposes, is a system test and does not live here. Under each method, group by
+exposes, is a system test and follows the
+[system standards](../rspec-system-testing-standards/SKILL.md). Under each method, group by
 outcome: a `context` for success and a `context` for failure. Guide:
 [Integration tests](../../docs/testing-guide.md#integration-tests), definition.
 
