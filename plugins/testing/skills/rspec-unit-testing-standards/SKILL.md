@@ -8,7 +8,9 @@ description: 'Rules for RSpec unit specs, on top of the scope-neutral rspec-base
 What a unit spec requires beyond the conventions every spec follows. A unit is a
 class, a module mixed into a host, a module of functions, or, in a Rails app, a
 component the guide's [Rails spec types](../../docs/testing-guide.md#rails-spec-types)
-table puts at unit scope. Load the
+table puts at unit scope. Unit specs live under `spec/unit`, or in a Rails app in the
+spec type directories at unit scope and a directory per area of plain Ruby, such as
+`spec/services`; a project override may name other roots. Load the
 [RSpec base standards](../rspec-base-standards/SKILL.md) first and apply it in full:
 this skill adds the rules that exist because the spec is a unit spec, and overrides
 nothing in it. Each rule is one sentence with a priority word, an example where one
@@ -74,7 +76,7 @@ Then, for each unit spec written or reviewed:
    three or more files (Rule 3).
 4. Every non-trivial collaborator is stubbed, and trivial values are passed as they
    are (Rule 4).
-5. The unit suite alone covers every line and branch of the unit (Rule 5).
+5. Unit specs alone cover every line and branch of the unit (Rule 5).
 6. No real time, randomness, sleep, or external process timing, and no change to
    `ENV`, the working directory, or any global (Rules 6, 7).
 7. A mixin is tested through a host, and module functions are called on the module
@@ -132,7 +134,13 @@ real, are not documented here or in the guide. Guide:
 
 ## Coverage
 
-### Rule 5 (MUST): The unit suite alone covers every line and branch
+### Rule 5 (MUST): Unit specs alone cover every line and branch
+
+For every unit this skill covers, unit is the narrowest scope that can run it, so the
+unit specs are its coverage run and no wider spec counts toward the gate. In a Rails
+app this run's gate is measured on every file except the framework-bound ones, which
+the integration standards measure in a run of their own, so a model or request spec
+never covers for a unit spec.
 
 When a branch is hard to reach, in order: reach it through the public interface; delete
 it, since an unreachable branch is usually dead code; last, exclude it with a coverage
@@ -235,18 +243,20 @@ override names the command that runs it. The rest are read.
 After writing or changing a spec:
 
 1. Run the spec file while writing it. Step 2 runs it again as part of the suite,
-   so this is the fast inner loop and not a separate signal.
+   so this is the fast inner loop and not a separate signal. Run each new or changed
+   example alone too, by line number, since the shared rule on ordering asks that
+   every example pass alone and no other step runs one that way.
 2. Confirm coverage of the unit under test is complete. The project override
-   names the command that fails below the gate; without one, run the unit specs
-   alone with SimpleCov, so no integration example masks a gap, and read the file's
-   line and branch figures in the report. SimpleCov measures lines only until its
+   names the command that runs the coverage run and fails below the gate; without
+   one, run the unit specs alone with SimpleCov, tracking every file except the
+   framework-bound ones, so no wider example masks a gap, and read the file's line and
+   branch figures in the report. That run takes the whole unit suite in the project's
+   random order, so it also checks the order half of the shared rule on ordering.
+   SimpleCov measures lines only until its
    config calls `enable_coverage :branch`, so a report with no branch column is not
    evidence for the branch half of Rule 5. A project with no coverage tool has no
    gate, and the check is reading each method's branches against the examples.
 3. Scan the spec against every MUST rule and fix what fails.
-4. Run the suite once with `--order defined`. Under the shared rule on ordering every
-   other run is random, so this is the only run in declaration order. Running one file
-   again in random order would only reshuffle its own examples.
 
 ## Output
 
