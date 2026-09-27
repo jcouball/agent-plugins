@@ -16,7 +16,9 @@ plugins/<plugin>/
   .claude-plugin/plugin.json        the plugin manifest, declares its skills
   skills/<skill>/SKILL.md           one directory per skill
   commands/<command>.md             one file per slash command
-scripts/                            the checks and the local install helper
+scripts/                            the checks, their tests, the local install
+                                    helper, and probe-github-rendering.mjs
+  lib/                              the checks' code, which the tests import
 metrics/<report>/                   a report, its data, the script that makes it
 ```
 
@@ -169,16 +171,25 @@ npm run ci
 Six checks, each runnable on its own:
 
 - `npm test` runs the tests for the check scripts themselves, with Node's
-  built-in test runner.
+  built-in test runner. The anchors the link check's tests expect are kept in
+  `scripts/check-links.cases.mjs`; when the check disagrees with GitHub about
+  a heading or an HTML anchor, add it there as a case.
 - `npm run lint:manifests` compares the marketplace manifest, the plugin
   manifests, and the skills on disk against each other, and fails when a skill
   is undeclared, a plugin is unlisted, a `SKILL.md` or a `plugin.json` has no
   description, the marketplace and the plugin manifest describe a plugin
   differently, or `plugin.json` and the plugin's `.release-please/` manifest
   disagree about a version.
-- `npm run lint:links` resolves every relative markdown link. External URLs are
-  left alone, since the links that rot here are the ones naming files in this
-  repository.
+- `npm run lint:links` resolves every relative markdown link, reports one that
+  leaves the repository, and checks that a `#fragment` on one names a heading
+  or HTML anchor in the page GitHub shows for it: the README, for a link to a
+  directory, and the linking page itself, for a link that is only a query
+  string such as `?x=1#usage`. External URLs are left alone, since the links
+  that rot here are the ones naming files in this repository, but a link with
+  a scheme GitHub strips, such as `tel:`, is reported. A fragment into a file
+  that is not markdown is not checked, and neither is a bare `#fragment` link:
+  markdownlint's MD051 checks those, so a broken one in a release-please
+  changelog, which markdownlint skips, goes unreported.
 - `npm run lint:actions` runs actionlint over `.github/workflows/`, which
   catches broken expressions, undefined contexts, bad `runs-on` labels, and
   wrong action inputs before a push finds them.
@@ -191,6 +202,14 @@ Six checks, each runnable on its own:
 
 CI runs the same checks in two jobs, `Lint and Validate` and
 `Verify Conventional Commits`.
+
+The link check copies three things from GitHub's rendering: the anchor each
+case expects, the HTML elements GitHub's sanitizer keeps, and the link schemes
+it keeps. `npm run probe:github` renders them all through GitHub's markdown
+API and reports any that GitHub now renders differently. It needs an
+authenticated `gh` and the network, so CI does not run it. Run it after adding
+a case, and when the link check reports a link that works on GitHub or passes
+one that does not.
 
 ## Adding a skill
 
