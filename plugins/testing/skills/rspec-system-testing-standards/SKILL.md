@@ -18,6 +18,9 @@ helps, and, where the guide reasons about it, a link to the paragraph of the
 **MUST** is mandatory; do not violate it without a documented exception. **SHOULD**
 is the default; override it when a clearer test requires it, and say so in a comment.
 
+System specs live under `spec/system`, or `spec/features` for Capybara feature specs;
+a project override may name another root.
+
 A system spec's subject is a workflow, not Ruby code, so these base rules change:
 
 - The top-level group names the feature in a string (base Rule 1), and examples are
@@ -32,7 +35,8 @@ A system spec's subject is a workflow, not Ruby code, so these base rules change
 
 The [unit](../rspec-unit-testing-standards/SKILL.md) and
 [integration](../rspec-integration-testing-standards/SKILL.md) standards do not apply
-here. System specs do not count toward the unit coverage gate.
+here. System specs are never in the coverage run: a narrower scope can run every
+line they reach.
 
 ## Contents
 

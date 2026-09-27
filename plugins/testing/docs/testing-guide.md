@@ -143,13 +143,22 @@ test depending on the implementers.
 Scope is how much real code runs in one test and where the doubles sit. The three
 values are **system**, **integration**, and **unit**, from most real code to least.
 Scope sets a test's cost, how precisely a failure points at the fault, and whether
-the test counts toward the coverage gate. Use the narrowest scope that can prove the
-claim. Every step outward costs speed, makes a failure point at more code, and moves
-the test out of the coverage gate, so a claim a unit test can prove is proved there
-and nowhere else. A test moves outward to integration or system for one of two
-reasons: the behavior it checks cannot be observed with collaborators doubled, or a
-unit test's stubs assume something about a real collaborator that only running the
-real collaborator can confirm.
+the test is in the coverage run. Use the narrowest scope that can prove the claim.
+Every step outward costs speed and makes a failure point at more code, so a claim a
+unit test can prove is proved there and nowhere else. A test moves outward to
+integration or system for one of two reasons: the behavior it checks cannot be
+observed with collaborators doubled, or a unit test's stubs assume something about a
+real collaborator that only running the real collaborator can confirm.
+
+**The coverage run.** Code counts as covered only by tests at the narrowest scope that
+can run it, and the coverage run is those tests. It must reach 100% line and branch
+coverage, and no other run counts toward that gate. For most code the narrowest scope
+is unit. The exception is **framework-bound code**: code whose behavior exists only
+inside a framework and its database, such as a Rails model or controller, which a unit
+test could reach only by doubling the framework. Its narrowest scope is integration,
+so its integration tests cover its conditional paths and are in the coverage run. A
+wider test never counts for code a narrower scope can reach: it ran the lines without
+being responsible for them, and counting it hides the gaps the gate exists to find.
 
 Cohn's test pyramid is the usual picture of the result: many unit tests, fewer
 integration tests, few system tests, because cost rises and failure precision falls
@@ -246,6 +255,10 @@ layers, a return shape one layer produces and the next misreads, an encoding
 assumption that holds in one place and not another. Unit tests cannot find these
 because each side of the seam is doubled from the other's point of view.
 
+Also for [framework-bound code](#test-types), where integration is the narrowest
+scope: its integration tests cover its conditional paths, as unit tests do for other
+code, and are in the coverage run.
+
 Also to confirm what a unit test's stubs assume. A stub encodes a belief about what
 the real collaborator returns, and a verifying double checks only that the method
 exists, not what it returns. Rainsberger calls the unit tests collaboration tests and
@@ -307,7 +320,8 @@ return, for every conditional path. It does not prove that the collaborators ret
 that, or that the doubles match the real interface beyond what verifying doubles
 check. Those are integration-test facts.
 
-The unit tests alone must reach 100% line and branch coverage of the code they cover.
+Unit tests are the [coverage run](#test-types) for all code that is not
+framework-bound: they alone must reach 100% line and branch coverage of it.
 Integration and system tests add confidence about seams and environments, but they do
 not count toward that gate, and a branch that only an integration test reaches is a
 gap in the unit tests. Coverage says a line ran, not that a test would fail if the
@@ -1003,13 +1017,16 @@ are choices the author still makes inside any of them.
 Model specs test an ActiveRecord or ActiveModel class: validations, associations,
 scopes, callbacks, and business methods. They usually run against a real test
 database, so despite the name they are closer to integration tests than to class unit
-tests.
+tests. A model is framework-bound code, so its model spec covers every conditional path
+and is in the coverage run.
 
 ### Request specs
 
 Request specs send a full HTTP request through routing and the middleware stack and
 assert on the response body, status, headers, and any side effects. Current
-`rspec-rails` recommends them for testing HTTP behavior.
+`rspec-rails` recommends them for testing HTTP behavior. A controller is
+framework-bound code, so its request specs cover each action's conditional paths and
+are in the coverage run.
 
 ### Feature and system specs
 
@@ -1057,7 +1074,8 @@ Controller specs instantiate a controller and call an action directly, then asse
 assigned instance variables, the rendered template name, and the response status.
 Rails 5 deprecated this approach in favor of request specs because it bypasses
 routing and middleware and asserts on internals that request specs do not need to
-know about.
+know about. New work goes in request specs; existing controller specs stay in the
+coverage run until request specs replace them.
 
 ### Generator specs
 
