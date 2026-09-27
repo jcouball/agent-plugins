@@ -171,9 +171,10 @@ Five checks, each runnable on its own:
 
 - `npm run lint:manifests` compares the marketplace manifest, the plugin
   manifests, and the skills on disk against each other, and fails when a skill
-  is undeclared, a plugin is unlisted, a `SKILL.md` has no description, or
-  `plugin.json` and the plugin's `.release-please/` manifest disagree about a
-  version.
+  is undeclared, a plugin is unlisted, a `SKILL.md` or a `plugin.json` has no
+  description, the marketplace and the plugin manifest describe a plugin
+  differently, or `plugin.json` and the plugin's `.release-please/` manifest
+  disagree about a version.
 - `npm run lint:links` resolves every relative markdown link. External URLs are
   left alone, since the links that rot here are the ones naming files in this
   repository.
