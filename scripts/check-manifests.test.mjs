@@ -74,3 +74,19 @@ test('reports a marketplace description that differs from plugin.json', () => {
   assert.equal(errors.length, 1)
   assert.match(errors[0], /^description mismatch for jcouball-demo at character 5:/)
 })
+
+test('reports front matter that is not valid YAML', () => {
+  const errors = run(tree({ [skillFile]: skill('name: do-thing\ndescription: Use when: a thing needs doing') }))
+  assert.equal(errors.length, 1)
+  assert.match(errors[0], /^plugins\/demo\/skills\/do-thing\/SKILL\.md front matter is not valid YAML: /)
+})
+
+test('reads quoted front matter values without their quotes', () => {
+  assert.deepEqual(run(tree({ [skillFile]: skill('name: "do-thing"\ndescription: \'Use when a thing needs doing\'') })), [])
+})
+
+test('reports a description that is empty once parsed', () => {
+  assert.deepEqual(run(tree({ [skillFile]: skill('name: do-thing\ndescription: ""') })), [
+    `${skillFile} frontmatter has no description`,
+  ])
+})
