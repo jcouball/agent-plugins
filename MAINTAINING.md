@@ -37,9 +37,8 @@ package that wants more. CI pins its version in `ci.yml`.
 
 The install puts commitlint and markdownlint in place and points git at the
 hooks in `.husky`, so it has to run once per clone or the hooks do nothing.
-The checks under `scripts/` are plain Node scripts with no dependencies.
 
-The one exception is actionlint, a Go binary. `npm run lint:actions` downloads
+actionlint is a Go binary, not an npm package. `npm run lint:actions` downloads
 the pinned release from GitHub, checks it against a checksum recorded in the
 script, runs it, and deletes it. A copy already on `PATH` is used instead when
 it reports the pinned version, so an actionlint you installed yourself — from

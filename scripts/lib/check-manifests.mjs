@@ -8,6 +8,7 @@
 
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
+import { parse } from 'yaml'
 
 // Every problem found under root, and how many plugins were checked.
 export function checkManifests(root) {
@@ -34,13 +35,13 @@ export function checkManifests(root) {
     return readdirSync(path).filter((name) => statSync(join(path, name)).isDirectory())
   }
 
-  // Parses just enough YAML for skill frontmatter: top-level `key: value` pairs
-  // between the opening and closing `---`. A real YAML parser would be a
-  // dependency for four lines of input.
+  // The YAML between a skill's opening and closing `---`, parsed; null when
+  // there is no such block, and undefined, reported here, when it does not
+  // parse. Claude Code parses it as YAML, so this does too: a
+  // description holding an unquoted `: ` looks fine line by line and is not
+  // valid YAML at all.
   const frontmatter = (relative) => {
-    // Split on either ending. A CRLF file leaves a trailing \r on every line,
-    // and JS regex '.' does not match \r, so the field pattern below would fail
-    // on all of them.
+    // Split on either ending, so a CRLF file parses the same as an LF one.
     const lines = readFileSync(join(root, relative), 'utf8').split(/\r?\n/)
     if (lines[0].trim() !== '---') return null
     // Trim before comparing. A file written with CRLF endings closes its
@@ -48,12 +49,13 @@ export function checkManifests(root) {
     // perfectly good skill as having no frontmatter at all.
     const end = lines.findIndex((line, index) => index > 0 && line.trim() === '---')
     if (end === -1) return null
-    const fields = {}
-    for (const line of lines.slice(1, end)) {
-      const match = line.match(/^([A-Za-z_-]+):\s*(.*)$/)
-      if (match) fields[match[1]] = match[2].trim()
+    try {
+      const fields = parse(lines.slice(1, end).join('\n'))
+      return fields !== null && typeof fields === 'object' ? fields : {}
+    } catch (error) {
+      fail(`${relative} front matter is not valid YAML: ${error.message.split('\n')[0]}`)
+      return undefined
     }
-    return fields
   }
 
   const marketplace = readJson('.claude-plugin/marketplace.json')
@@ -202,7 +204,8 @@ export function checkManifests(root) {
       }
 
       const fields = frontmatter(skillFile)
-      if (!fields) {
+      if (fields === undefined) continue
+      if (fields === null) {
         fail(`${skillFile} has no frontmatter block`)
         continue
       }
@@ -212,7 +215,7 @@ export function checkManifests(root) {
       }
       // Claude Code routes on the description alone. A skill without one is
       // installed but unreachable.
-      if (!fields.description) fail(`${skillFile} frontmatter has no description`)
+      if (typeof fields.description !== 'string' || !fields.description.trim()) fail(`${skillFile} frontmatter has no description`)
     }
 
     const commands = join(root, 'plugins', plugin, 'commands')
