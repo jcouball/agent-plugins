@@ -1,13 +1,16 @@
 ---
 name: rspec-integration-testing-standards
-description: 'Rules for RSpec integration specs: when a seam earns one, one spec per class or module, what to assert against a real dependency and what not to, owning temporary state and the environment, subprocesses without a shell, and portability. Use when writing, reviewing, or auditing RSpec integration specs, deciding whether a behavior needs an integration test or a unit test, or asserting on the output of a real external process. If the current project has its own rspec-integration-testing-standards skill, that file holds project-specific changes and additions: still apply this skill, and apply those changes on top (Step 0).'
+description: 'Rules for RSpec integration specs: when a seam earns one, one spec per class or module, what to assert against a real dependency and what not to, owning temporary state and the environment, subprocesses without a shell, portability, and Rails model and request specs covering framework-bound code. Use when writing, reviewing, or auditing RSpec integration specs, deciding whether a behavior needs an integration test or a unit test, or asserting on the output of a real external process. If the current project has its own rspec-integration-testing-standards skill, that file holds project-specific changes and additions: still apply this skill, and apply those changes on top (Step 0).'
 ---
 
 # RSpec integration testing standards
 
 Rules for writing and reviewing RSpec integration specs: tests that run several real
 components together down to a real external process, service, or filesystem, short of
-the whole system. Load the [RSpec base standards](../rspec-base-standards/SKILL.md)
+the whole system. Integration specs live under `spec/integration`, or in a Rails app
+in the spec type directories at integration scope, such as `spec/models` and
+`spec/requests`; a project override may name other roots. Load the
+[RSpec base standards](../rspec-base-standards/SKILL.md)
 first and apply it in full; every convention there holds at this scope. Each rule below
 is one sentence with a priority word, an example where one helps, and, where the guide
 reasons about it, a link to the paragraph of the
@@ -31,7 +34,8 @@ repoint it:
 - Stubbing collaborators is inverted. The classes in the path and the dependency at
   its end are real; a double sits only at the outermost edge, cutting off a part of
   the system the seam under test does not reach.
-- The coverage gate is replaced by Rule 7 below.
+- The coverage gate is replaced by Rule 7 below, except for framework-bound code,
+  which Rule 13 puts in the coverage run.
 - Determinism changes shape: the external process runs on its own clock with its own
   randomness, which no stub reaches. The spec asserts nothing those decide, per Rule 5
   below, and pins what the process would otherwise take from the machine, per Rule 11
@@ -47,6 +51,7 @@ This skill states only what differs at integration scope.
 - [Scope](#scope)
 - [Assertions](#assertions)
 - [State and environment](#state-and-environment)
+- [Rails model and request specs](#rails-model-and-request-specs)
 - [What the tools check](#what-the-tools-check)
 - [Verification](#verification)
 - [Output](#output)
@@ -55,8 +60,8 @@ This skill states only what differs at integration scope.
 
 A project may carry its own thin copy of this skill holding only its local changes and
 additions: where its integration specs live, the helpers and shared contexts that build
-its temporary state, how it starts the external process, how coverage is configured and
-whether integration specs count toward the gate, where the minimum dependency version is
+its temporary state, how it starts the external process, how its coverage run is
+configured, where the minimum dependency version is
 recorded and how its version-guard helper is defined, and its own conventions for
 particular class families. Check for one at each of these paths and use the first that
 exists:
@@ -88,7 +93,8 @@ govern every convention this skill builds on.
 In order, for each spec written or reviewed:
 
 1. Name the seam this test checks that no unit test can (Rule 1).
-2. One spec file per class or module; group by public method (Rule 2).
+2. One spec file per class, module, or resource; group by public method or endpoint
+   (Rule 2).
 3. One example per shape the real dependency returns, plus at least one failure
    (Rules 3, 4).
 4. Assert on structure and on values the test controls, never on the dependency's
@@ -98,7 +104,9 @@ In order, for each spec written or reviewed:
 7. No shell, no `cwd` or `ENV` changes, no platform-only paths (Rules 9 to 11).
 8. An example that needs a newer dependency than the project's minimum skips with
    a reason (Rule 12).
-9. Every shared convention holds too. Run the
+9. A Rails model or request spec covers every conditional path of its model or
+   action, with records it builds and a transaction removes (Rules 13, 14).
+10. Every shared convention holds too. Run the
    [shared checklist](../rspec-base-standards/SKILL.md#checklist).
 
 ## Scope
@@ -113,7 +121,7 @@ unit work and does not get an integration spec. Guide:
 [Integration tests](../../docs/testing-guide.md#integration-tests), when to choose
 it.
 
-### Rule 2 (MUST): One spec file per class or module, grouped by public method
+### Rule 2 (MUST): One spec file per class, module, or resource
 
 The path an example runs crosses several real classes on its way to the dependency;
 the file belongs to the class whose public method the example calls, and it does not
@@ -121,7 +129,9 @@ also exercise the lower classes through their own interfaces. A spec that drives
 whole application, or a workflow a user performs rather than a method the code
 exposes, is a system test and follows the
 [system standards](../rspec-system-testing-standards/SKILL.md). Under each method, group by
-outcome: a `context` for success and a `context` for failure. Guide:
+outcome: a `context` for success and a `context` for failure. A request spec's file
+belongs to its resource, with one group per endpoint, as the base standards' Rules 1
+and 2 show. Guide:
 [Integration tests](../../docs/testing-guide.md#integration-tests), definition.
 
 ### Rule 3 (MUST): One example per return shape of the real dependency
@@ -179,8 +189,8 @@ the framework or a library](../../docs/testing-guide.md#test-anti-patterns) and
 
 An integration example that exercises a branch of the code's own logic, rather than a
 shape the real dependency returns, is a missing unit spec; the integration suite does
-not repeat option-by-option cases. Whether it counts toward the coverage gate is the
-project's configuration, which its override records. Guide: [Integration
+not repeat option-by-option cases. Integration specs are outside the coverage run,
+except for framework-bound code, which Rule 13 covers. Guide: [Integration
 tests](../../docs/testing-guide.md#integration-tests), anti-patterns.
 
 ## State and environment
@@ -238,6 +248,35 @@ example, because `skip:` metadata is evaluated in the group body where no `let` 
 yet; one defined at module level works in either form. Guide: [Integration
 tests](../../docs/testing-guide.md#integration-tests), real and doubled.
 
+## Rails model and request specs
+
+A model and a controller are framework-bound code: their behavior exists only with
+Rails and its database, so no unit spec reaches them, and their integration specs do
+the unit specs' job. For a model spec or a request spec, Rule 13 replaces Rules 1, 3,
+4, and 7, and Rule 14 replaces Rule 8 for database records; Rule 8 still holds for
+files. The spec exists for the code, not for a seam, and the database is not the
+external program those rules assume. Controller specs follow the same rules, but
+new work goes in request specs, which Rails recommends in their place. Generator specs
+write real files to a temporary destination and follow the rules above as written.
+
+### Rule 13 (MUST): Model and request specs cover every conditional path of their code
+
+A model spec covers the model's validations, scopes, callbacks, and methods; a request
+spec covers each branch of its action, through the request. Both are in the coverage
+run. The gate measures the whole run and cannot say which spec covered a line, so a
+request spec that happens to reach a model branch hides a gap in the model spec: check
+each model branch against the model spec itself. Guide: [Integration
+tests](../../docs/testing-guide.md#integration-tests), when to choose it, and [Model
+specs](../../docs/testing-guide.md#model-specs).
+
+### Rule 14 (MUST): Each example builds its records, and a transaction removes them
+
+Build them inside the example or its `let` and `before`, with factories, and let
+Rails' transactional tests roll them back. Use `build` or `build_stubbed` where the
+example never reads the record back from the database. No example reads a record it
+did not create, except reference data the project loads once and never writes, which
+its override names. Guide: [Rails smells](../../docs/testing-guide.md#rails-smells).
+
 ## What the tools check
 
 Rules 8 and 10 are partly mechanical: a suite that runs in random order and in parallel
@@ -259,10 +298,11 @@ which removed it after a deprecation in 3.3, so the pattern keeps it. Read the
 hits: the word inside a description string is not a call. A gem that wraps these, such
 as `TTY::Command` or `Open4`, matches nothing here; read the spec's requires for one.
 
-The coverage report shows one half of Rule 7, a branch only an integration spec reaches,
-but only where the project excludes integration specs from coverage. Under one combined
-run that branch reads as covered and the report says nothing. The other half, an
-integration file that repeats cases the unit specs cover, leaves no trace in any report.
+The coverage run shows one half of Rule 7: a branch only an integration spec reaches
+reads as uncovered there, since integration specs of code that is not framework-bound
+are outside it. A coverage report from one run of the whole suite hides it. The other
+half, an integration file that repeats cases the unit specs cover, leaves no trace in
+any report.
 For each `context` in the integration file, ask what differs at the dependency. A
 distinct shape the real dependency returns is a Rule 3 example and stays, even when a
 unit context stubs the same condition, because confirming that stub is its purpose. A
@@ -295,5 +335,5 @@ rm -rf "$run_tmp"
 When writing, produce the spec and run the verification above. When reviewing or
 auditing, produce a table with one row per rule, marked Pass, Fail, or N/A with the
 issue, then the MUST violations to fix, then the SHOULD deviations ordered by
-impact. The table covers the shared rules as well as this skill's twelve; a
-twelve-row table has audited a fraction of what applies.
+impact. The table covers the shared rules as well as this skill's fourteen; a
+fourteen-row table has audited a fraction of what applies.
