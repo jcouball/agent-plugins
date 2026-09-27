@@ -109,6 +109,9 @@ for (const plugin of pluginDirectories) {
     continue
   }
   if (!manifest.version) fail(`${manifestPath} has no version`)
+  // The catalog and `claude plugin details` both show this. A plugin without
+  // one installs but describes itself to nobody.
+  if (!manifest.description) fail(`${manifestPath} has no description`)
 
   const entry = listed.get(manifest.name)
   if (!entry) {
@@ -117,6 +120,23 @@ for (const plugin of pluginDirectories) {
     claimed.add(manifest.name)
     if (entry.source !== `./plugins/${plugin}`) {
       fail(`marketplace source for ${manifest.name} is ${entry.source}, expected ./plugins/${plugin}`)
+    }
+
+    // The marketplace entry is the catalog copy and plugin.json is what
+    // `claude plugin details` prints. They describe the same plugin, so they
+    // drift silently when a skill is added and only one is updated. Both are
+    // long, so point at the first character that differs rather than printing
+    // two paragraphs the reader has to diff by eye.
+    if (entry.description !== manifest.description) {
+      const a = entry.description ?? ''
+      const b = manifest.description ?? ''
+      let at = 0
+      while (at < a.length && at < b.length && a[at] === b[at]) at += 1
+      fail(
+        `description mismatch for ${manifest.name} at character ${at}:\n` +
+          `    marketplace: ...${a.slice(Math.max(0, at - 20), at + 40)}\n` +
+          `    ${manifestPath}: ...${b.slice(Math.max(0, at - 20), at + 40)}`
+      )
     }
   }
 
