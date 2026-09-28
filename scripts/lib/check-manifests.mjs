@@ -215,13 +215,19 @@ export function checkManifests(root) {
         fail(`${skillFile} has no frontmatter block`)
         continue
       }
-      if (!fields.name) fail(`${skillFile} frontmatter has no name`)
+      // YAML reads `name: 2048` as a number, which would otherwise be reported
+      // as not matching the directory "2048".
+      if (fields.name === undefined || fields.name === null || fields.name === '') fail(`${skillFile} frontmatter has no name`)
+      else if (typeof fields.name !== 'string') fail(`${skillFile} frontmatter name is not a string; quote it`)
       else if (fields.name !== skill) {
         fail(`${skillFile} frontmatter name is "${fields.name}", expected "${skill}" to match its directory`)
       }
       // Claude Code routes on the description alone. A skill without one is
       // installed but unreachable.
-      if (typeof fields.description !== 'string' || !fields.description.trim()) fail(`${skillFile} frontmatter has no description`)
+      const described = fields.description
+      if (described === undefined || described === null || (typeof described === 'string' && !described.trim())) {
+        fail(`${skillFile} frontmatter has no description`)
+      } else if (typeof described !== 'string') fail(`${skillFile} frontmatter description is not a string; quote it`)
     }
 
     const commands = join(root, 'plugins', plugin, 'commands')
