@@ -75,6 +75,10 @@ export function checkManifests(root) {
   for (const [index, entry] of entries.entries()) {
     // sync-plugins.mjs calls entry.source.replace() on every entry. Letting a
     // malformed one through here trades this message for a TypeError there.
+    if (entry === null || typeof entry !== 'object' || Array.isArray(entry)) {
+      fail(`marketplace plugin at index ${index} is not an object`)
+      continue
+    }
     if (typeof entry.name !== 'string') {
       fail(`marketplace plugin at index ${index} has no name, or its name is not a string`)
       continue

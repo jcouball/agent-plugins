@@ -119,6 +119,15 @@ test('reports a plugin.json with no description once, not also as a mismatch', (
   }
 })
 
+test('reports a marketplace entry that is not an object instead of throwing', () => {
+  const entries = [null, 'jcouball-demo', ['jcouball-demo'], { name: 'jcouball-demo', source: './plugins/demo', description }]
+  assert.deepEqual(run(tree({ '.claude-plugin/marketplace.json': JSON.stringify({ plugins: entries }) })), [
+    'marketplace plugin at index 0 is not an object',
+    'marketplace plugin at index 1 is not an object',
+    'marketplace plugin at index 2 is not an object',
+  ])
+})
+
 test('reports a marketplace description that is not a string', () => {
   const marketplace = JSON.stringify({ plugins: [{ name: 'jcouball-demo', source: './plugins/demo', description: 42 }] })
   assert.deepEqual(run(tree({ '.claude-plugin/marketplace.json': marketplace })), [
