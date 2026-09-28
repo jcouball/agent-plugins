@@ -92,6 +92,9 @@ export function checkManifests(root) {
     }
 
     listed.set(entry.name, entry)
+    if (entry.description !== undefined && typeof entry.description !== 'string') {
+      fail(`marketplace lists ${entry.name} with a description that is not a string`)
+    }
     if (!existsSync(join(root, entry.source))) {
       fail(`marketplace lists ${entry.name} with a source that does not exist: ${entry.source}`)
     }
@@ -112,6 +115,7 @@ export function checkManifests(root) {
     // The catalog and `claude plugin details` both show this. A plugin without
     // one installs but describes itself to nobody.
     if (!manifest.description) fail(`${manifestPath} has no description`)
+    else if (typeof manifest.description !== 'string') fail(`${manifestPath} has a description that is not a string`)
 
     const entry = listed.get(manifest.name)
     if (!entry) {
@@ -126,8 +130,10 @@ export function checkManifests(root) {
       // `claude plugin details` prints. They describe the same plugin, so they
       // drift silently when a skill is added and only one is updated. Both are
       // long, so point at the first character that differs rather than printing
-      // two paragraphs the reader has to diff by eye.
-      if (entry.description !== manifest.description) {
+      // two paragraphs the reader has to diff by eye. A description that is not
+      // a string is reported above, and has no characters to point at.
+      const comparable = [entry.description, manifest.description].every((d) => d === undefined || typeof d === 'string')
+      if (comparable && entry.description !== manifest.description) {
         const a = entry.description ?? ''
         const b = manifest.description ?? ''
         let at = 0
