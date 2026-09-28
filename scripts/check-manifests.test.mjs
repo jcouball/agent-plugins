@@ -85,6 +85,26 @@ test('reads quoted front matter values without their quotes', () => {
   assert.deepEqual(run(tree({ [skillFile]: skill('name: "do-thing"\ndescription: \'Use when a thing needs doing\'') })), [])
 })
 
+test('reports a name that YAML reads as something other than a string', () => {
+  const numbered = 'plugins/demo/skills/2048/SKILL.md'
+  const manifest = JSON.stringify({ name: 'jcouball-demo', version: '0.1.0', description, skills: ['./skills/2048'] })
+  const files = (name) => {
+    const all = tree({ 'plugins/demo/.claude-plugin/plugin.json': manifest, [numbered]: skill(`name: ${name}\ndescription: Use when`) })
+    delete all[skillFile]
+    return all
+  }
+  assert.deepEqual(run(files('2048')), [`${numbered} frontmatter name is not a string; quote it`])
+  assert.deepEqual(run(files('"2048"')), [])
+})
+
+test('reports a description that YAML reads as something other than a string', () => {
+  for (const value of ['2048', '[a, b]']) {
+    assert.deepEqual(run(tree({ [skillFile]: skill(`name: do-thing\ndescription: ${value}`) })), [
+      `${skillFile} frontmatter description is not a string; quote it`,
+    ])
+  }
+})
+
 test('reports a description that is empty once parsed', () => {
   assert.deepEqual(run(tree({ [skillFile]: skill('name: do-thing\ndescription: ""') })), [
     `${skillFile} frontmatter has no description`,
