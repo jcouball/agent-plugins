@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.1](https://github.com/jcouball/agent-plugins/compare/marketplace-v2.0.0...marketplace-v2.0.1) (2026-09-28)
+
+
+### Other Changes
+
+* **marketplace:** Point add-skill at the current overrides wording ([f95daa7](https://github.com/jcouball/agent-plugins/commit/f95daa73bde6475f8a3c8548f0e65f0e6b96d493))
+
 ## [2.0.0](https://github.com/jcouball/agent-plugins/compare/marketplace-v1.1.0...marketplace-v2.0.0) (2026-08-27)
 
 
