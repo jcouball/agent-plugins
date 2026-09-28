@@ -90,3 +90,31 @@ test('reports a description that is empty once parsed', () => {
     `${skillFile} frontmatter has no description`,
   ])
 })
+
+test('reports a marketplace description that is not a string', () => {
+  const marketplace = JSON.stringify({ plugins: [{ name: 'jcouball-demo', source: './plugins/demo', description: 42 }] })
+  assert.deepEqual(run(tree({ '.claude-plugin/marketplace.json': marketplace })), [
+    'marketplace lists jcouball-demo with a description that is not a string',
+  ])
+})
+
+test('reports descriptions that are not strings even when they match', () => {
+  const manifestPath = 'plugins/demo/.claude-plugin/plugin.json'
+  const errors = run(
+    tree({
+      '.claude-plugin/marketplace.json': JSON.stringify({
+        plugins: [{ name: 'jcouball-demo', source: './plugins/demo', description: 42 }],
+      }),
+      [manifestPath]: JSON.stringify({
+        name: 'jcouball-demo',
+        version: '0.1.0',
+        description: 42,
+        skills: ['./skills/do-thing'],
+      }),
+    }),
+  )
+  assert.deepEqual(errors, [
+    'marketplace lists jcouball-demo with a description that is not a string',
+    `${manifestPath} has a description that is not a string`,
+  ])
+})
