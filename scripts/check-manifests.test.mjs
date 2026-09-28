@@ -111,6 +111,14 @@ test('reports a description that is empty once parsed', () => {
   ])
 })
 
+test('reports a plugin.json with no description once, not also as a mismatch', () => {
+  const manifestPath = 'plugins/demo/.claude-plugin/plugin.json'
+  for (const missing of [{}, { description: '' }]) {
+    const manifest = JSON.stringify({ name: 'jcouball-demo', version: '0.1.0', skills: ['./skills/do-thing'], ...missing })
+    assert.deepEqual(run(tree({ [manifestPath]: manifest })), [`${manifestPath} has no description`])
+  }
+})
+
 test('reports a marketplace description that is not a string', () => {
   const marketplace = JSON.stringify({ plugins: [{ name: 'jcouball-demo', source: './plugins/demo', description: 42 }] })
   assert.deepEqual(run(tree({ '.claude-plugin/marketplace.json': marketplace })), [

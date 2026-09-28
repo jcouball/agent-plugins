@@ -130,9 +130,13 @@ export function checkManifests(root) {
       // `claude plugin details` prints. They describe the same plugin, so they
       // drift silently when a skill is added and only one is updated. Both are
       // long, so point at the first character that differs rather than printing
-      // two paragraphs the reader has to diff by eye. A description that is not
-      // a string is reported above, and has no characters to point at.
-      const comparable = [entry.description, manifest.description].every((d) => d === undefined || typeof d === 'string')
+      // two paragraphs the reader has to diff by eye. A plugin.json description
+      // that is missing, empty, or not a string is reported above, and a
+      // description that is not a string has no characters to point at.
+      const comparable =
+        typeof manifest.description === 'string' &&
+        manifest.description !== '' &&
+        (entry.description === undefined || typeof entry.description === 'string')
       if (comparable && entry.description !== manifest.description) {
         const a = entry.description ?? ''
         const b = manifest.description ?? ''
