@@ -46,6 +46,7 @@ tests measure other qualities and are out of scope.
     - [Class unit tests](#class-unit-tests)
     - [Module and mixin unit tests](#module-and-mixin-unit-tests)
     - [Module method unit tests](#module-method-unit-tests)
+  - [Structure and naming in RSpec](#structure-and-naming-in-rspec)
   - [Doubles in RSpec](#doubles-in-rspec)
   - [Verification in RSpec](#verification-in-rspec)
   - [Gems](#gems)
@@ -211,7 +212,9 @@ state left by an earlier test.
 **Definition.** An integration test runs several real components together across a
 boundary that unit tests replace with doubles, without covering the whole system. The
 typical case is a high-level method that calls a lower-level class which in turn
-talks to an external process or service.
+talks to an external process or service. The test belongs to the class whose method it
+calls. The path crosses the lower classes on the way down, and testing them again
+through their own interfaces runs the same path twice without checking a new seam.
 
 The term is the most overloaded in testing. Fowler splits it into narrow integration
 tests, two components with everything else doubled, and broad ones, a live-like slice
@@ -228,6 +231,27 @@ a place no other example can reach, and removes it when the example ends whether
 assertions passed or not. No test reads state it did not create, and no test writes
 to state that others read.
 
+Owning the state means owning the environment around it, and the environment is wider
+here than for a unit test. Anything the process shares, the working directory and the
+environment among it, is read by every thread in that process, so a test that changes it
+is not isolated however carefully it restores it. Anything the test reads but did not
+create, including a file left where other tests reach it, is a result it cannot account
+for; a fixture read and never written is input rather than state, and [Test
+data](#test-data) says when one earns its place.
+
+The dependency at the end of the path is a program, not a library, and what it does
+varies by version and by platform. A test that leaves a default to the machine, such as
+a tool's default branch name, passes or fails with the runner's configuration. A spec
+that hard-codes `/tmp` or a path separator fails on a platform the code supports. A
+suite whose examples depend on the installed version covers different behavior on each
+machine. An example that needs a newer version than the oldest supported one skips with
+a reason there, so the gap shows in the output, and running CI on both the oldest
+supported version and a current one runs every example somewhere. The test
+starts that program the way the code does, through the library's own
+execution path. A test that goes through a shell instead proves a path the code never
+takes, and adds the shell's quoting and the `PATH` it searches to what varies by
+machine.
+
 **When to choose it.** When the risk is in a seam: wrong argument order between two
 layers, a return shape one layer produces and the next misreads, an encoding
 assumption that holds in one place and not another. Unit tests cannot find these
@@ -243,8 +267,11 @@ the sociable school there are fewer stubs, and this reason applies only to the d
 that remain.
 
 **What it proves.** That the layers in the path agree with each other and with the
-real dependency at the end. It does not prove each layer's conditional paths; that is
-unit test work, and duplicating it here makes the suite slow for no added confidence.
+real dependency at the end. What the layers hand each other is the shape of a result
+and the values the test put in, so those are what its assertions check. Anything the
+dependency decides for itself, such as its wording, is the dependency's to test. It
+does not prove each layer's conditional paths; that is unit test work, and duplicating
+it here makes the suite slow for no added confidence.
 
 **Cost.** Slower than unit tests, faster than system tests. Setup that touches a
 subprocess or the filesystem is a frequent source of order dependence and flakiness.
@@ -349,6 +376,11 @@ where off-by-one mistakes live: zero, one, the maximum, one past it. Decision ta
 enumerate the combinations of conditions a method branches on so that no combination
 is skipped. Together they turn "I thought of these cases" into "these are the cases,
 and here is why there are no others".
+
+A boundary case lives beside the normal case for the same method and condition, not
+in a separate group of edge cases at the end. The reader should see a class and its
+edges together, and a group named "edge cases" says nothing about which condition
+each one is an edge of.
 
 #### Contract tests
 
@@ -675,7 +707,7 @@ capture.
 
 Test data is the input a test builds and the state it arranges before the action.
 Most of the time spent writing a test goes here, and most Mystery Guests start here.
-The rules below hold at every scope.
+These practices hold at every scope.
 
 - **Build it in the example.** The reader should see every value the assertion
   depends on without leaving the example or its enclosing group. Setup that lives in
@@ -723,9 +755,9 @@ per-type sections above do not repeat them.
   seam, change it inside a hook that restores it even when the example fails. Even
   restored, the mutation is visible to any thread running in the process at the time,
   including threads started by an earlier example, so this is a last resort.
-- **Non-determinism** from the clock, random values, or thread timing that the test
-  does not control. Fix the seed, inject the clock, and synchronize on an event
-  rather than a delay.
+- **Non-determinism** from the clock, random values, the order a directory listing
+  returns, or thread timing that the test does not control. Pass a seeded random source,
+  inject the clock, sort the listing, and synchronize on an event rather than a delay.
 - **Conditional logic in a test.** An `if`, a loop, or a `rescue` inside an example
   means the example tests different things on different runs and can itself be wrong.
   Each branch of the conditional is its own example.
@@ -738,9 +770,12 @@ per-type sections above do not repeat them.
   reader trusts when the example is collapsed or listed in a failure report.
 - **Error assertions without a message pattern.** Checking the class alone lets a
   different failure with the same class pass. Match the class and a message pattern.
-- **Committed skip or focus markers.** A pending example that never gets un-pended is
-  a test that silently stopped running. A focus marker that reaches the main branch
-  turns off the rest of the suite. Both are review findings, not style.
+- **Committed skip or focus markers.** An unconditional pending example that never
+  gets un-pended is a test that silently stopped running. A focus marker that reaches
+  the main branch turns off the rest of the suite. Both are review findings, not
+  style. A guard that skips on a stated condition, such as a dependency older than the
+  feature under test, is not one of these: it names why it skipped and it runs
+  everywhere the condition holds.
 - **Test logic in production code.** A code path, setter, or environment check that
   exists only so a test can reach something. A seam added for testability must be a
   real improvement to the design, such as a parameter with a sensible default, not a
@@ -791,7 +826,18 @@ in what the subject is and how it is set up.
 
 **Definition.** A class unit test exercises one class through its public interface.
 The spec has one top-level `describe` for the class and one nested `describe` per
-public method, and the spec file's path mirrors the source file's path.
+public method, and the spec file's path mirrors the source file's path, so the spec
+for any class can be found without searching. Each require beyond the suite's helper
+and the source file under test is a coupling: a rename or move elsewhere in the
+codebase breaks a spec that never tested that code.
+
+The constructor is public too, but what it mostly does is store its arguments for the
+other methods, and their examples cover that. It earns examples of its own in two
+cases. When a public reader can see what it stored, one example says what a new
+instance holds, which documents the constructor and catches an override that drops an
+argument. When it validates or branches, each path is behavior like any other. A reader
+added only so a spec can see the stored value is [Test logic in production
+code](#test-anti-patterns).
 
 **Real and doubled.** Only the class under test is real. Non-trivial collaborators
 are stubbed and trivial values are passed in as they are, as described under [Unit
@@ -861,6 +907,27 @@ pure, this is often the shape with the fewest doubles.
 `module_function` through an includer, which mixes this shape with a mixin test and
 muddies what failed.
 
+### Structure and naming in RSpec
+
+The shapes above are written in RSpec's three nested groups. `describe` names what is
+tested: the class at the top, then one block per public method, prefixed `#` for
+instance methods and `.` for class methods. `context` names a condition, and its
+description starts with "when", "with", or "without" so that the nesting reads as a
+sentence. `it` states one expected behavior, in words that match the assertion. A
+method with a single path and no conditions worth naming puts its `it` directly
+under `describe`.
+
+Lazy evaluation means declaration order carries no meaning for RSpec: a `let` may be
+defined after the `subject` that uses it and still resolve. So the order a spec is
+written in is a convention kept for the reader, who should meet the call under test
+before its inputs, and see a condition change only the input it is about. A `subject`
+buried under its inputs, or a `context` that redefines everything, hides what the
+example is about. The `subject` is the call under test, named for what it returns, so
+`is_expected` and every example in the group are statements about that result; for
+`#initialize` the result is the new instance. Writing the construction once, where
+several methods build the instance the same way, is that argument applied to change:
+one place to edit when the constructor moves.
+
 ### Doubles in RSpec
 
 The construct that produces each kind of double under [Test doubles](#test-doubles):
@@ -872,8 +939,10 @@ The construct that produces each kind of double under [Test doubles](#test-doubl
 - **Fake.** A hand-written class. RSpec has no construct for it.
 
 `instance_double`, `class_double`, and `object_double` make a stub, spy, or mock
-verifying. A plain `double` does not check its messages against any interface and is
-only appropriate as a dummy.
+verifying. A plain `double` does not check its messages against any interface, so it
+belongs where there is no interface to check: a dummy, a duck type with no single class
+behind it, or a class that answers through `SimpleDelegator` or `method_missing`, which
+a verifying double rejects.
 
 ### Verification in RSpec
 
@@ -881,10 +950,14 @@ only appropriate as a dummy.
   `have_attributes`, `match`.
 - **State-based.** A matcher on the subject or a collaborator after the action:
   `expect(obj.attr).to eq(...)`, `change { ... }`, or a matcher on a fake's contents.
+  `change` states the value before and after in one expectation, so the example cannot
+  pass on a starting value that already matched, and a failure shows both values.
+  `raise_error` does the same for an exception: a `rescue` in the example passes when
+  nothing is raised unless the example also remembers to fail.
 - **Communication-based.** `expect(obj).to receive(:msg)` before the action, or
-  `expect(obj).to have_received(:msg)` after it. Rule 19 in the unit testing
-  standards enforces the default: `allow` for incidental stubs, `expect` only for a
-  message that is the behavior under test.
+  `expect(obj).to have_received(:msg)` after it. The RSpec base standards' rule on
+  `allow` and `expect` enforces the default: `allow` for incidental stubs,
+  `expect` only for a message that is the behavior under test.
 
 ### Gems
 
