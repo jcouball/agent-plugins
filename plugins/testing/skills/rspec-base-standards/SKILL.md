@@ -5,8 +5,13 @@ description: 'Conventions every RSpec spec follows whatever its scope: naming th
 
 # RSpec base standards
 
-The conventions every RSpec spec follows, whatever it tests. The
-[unit](../rspec-unit-testing-standards/SKILL.md),
+Every spec reads the same way, whatever its scope. The nesting of `describe`,
+`context`, and `it` reads as a sentence naming the behavior under test, so a reader
+finds that behavior without reading the code, and a failing example's description
+says what broke. Guide:
+[Structure and naming in RSpec](../../docs/testing-guide.md#structure-and-naming-in-rspec).
+
+The [unit](../rspec-unit-testing-standards/SKILL.md),
 [integration](../rspec-integration-testing-standards/SKILL.md), and
 [system](../rspec-system-testing-standards/SKILL.md) standards each load
 this skill and add the rules their scope needs; where one of them overrides a rule

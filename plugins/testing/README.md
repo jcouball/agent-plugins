@@ -42,9 +42,10 @@ The skills are for writing a spec and for reviewing or auditing existing ones. A
 review or audit produces a table with one row per rule, marked Pass, Fail, or N/A,
 then the MUST violations to fix and the SHOULD deviations ordered by impact.
 
-Each skill opens with a checklist of its rules, and each rule is one sentence marked
-**MUST** or **SHOULD**. Break a MUST only with a documented exception. A SHOULD is
-the default. Set it aside when a clearer test needs it, and say why in a comment.
+Each skill opens with what a spec that follows it proves, then lists its rules in a
+checklist. Each rule is one sentence marked **MUST** or **SHOULD**. Break a MUST only
+with a documented exception. A SHOULD is the default. Set it aside when a clearer test
+needs it, and say why in a comment.
 Where the guide reasons about a rule, the rule links to that paragraph.
 
 ## Adapting the rules to a project
