@@ -82,6 +82,9 @@ Code.
 | Component | Name | What it does |
 | --- | --- | --- |
 | Skill | `testing-guide` | Points at the plugin's [testing guide](plugins/testing/docs/testing-guide.md), which defines the vocabulary for talking about tests, classifies them on six dimensions, and says which kind to write, with sections mapping it to Ruby, RSpec, and Rails. Loaded when asked why a testing rule exists or what a term means, not for ordinary test writing. |
+| Skill | `rspec-base-standards` | The conventions every RSpec spec follows whatever it tests, each marked MUST or SHOULD and traced to the reasoning in the testing guide. The two skills below build on it. |
+| Skill | `rspec-unit-testing-standards` | What a spec requires because it is a unit spec: the constructor, what it may require and stub, the coverage gate, and determinism. |
+| Skill | `rspec-integration-testing-standards` | What a spec requires because it runs real components down to a real external process: which seams earn one, what to assert, owning temporary state, and portability. |
 
 ### jcouball-marketplace
 
