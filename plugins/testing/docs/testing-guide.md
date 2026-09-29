@@ -46,6 +46,7 @@ tests measure other qualities and are out of scope.
     - [Class unit tests](#class-unit-tests)
     - [Module and mixin unit tests](#module-and-mixin-unit-tests)
     - [Module method unit tests](#module-method-unit-tests)
+  - [Structure and naming in RSpec](#structure-and-naming-in-rspec)
   - [Doubles in RSpec](#doubles-in-rspec)
   - [Verification in RSpec](#verification-in-rspec)
   - [Gems](#gems)
@@ -80,12 +81,11 @@ The rest of this guide explains the choices. This is the order to make them in.
    effect, assert on the state it changed. Use a mock only when the message to a
    collaborator is the behavior and nothing in the process records it. See
    [Verification](#verification).
-3. **Doubles.** Under the default solitary school, stub every non-trivial
-   collaborator with a verifying double. Under the sociable school, if the project's
-   override file chooses it, use real in-process collaborators and double only what
-   is slow, non-deterministic, or outside the process. Either way, pass strings,
-   hashes, and other plain values as they are, and reach for a fake when the
-   collaborator's state is what the test reads. See [Test doubles](#test-doubles)
+3. **Doubles.** Stub every non-trivial collaborator with a verifying double. Pass
+   plain values, data objects, and value objects as they are, and let the unit's
+   private helpers run. Reach for a fake when the collaborator's state is what the
+   test reads. This is the solitary school, the only
+   one this guide documents. See [Test doubles](#test-doubles)
    and [Unit tests](#unit-tests).
 4. **Cases.** One example per conditional path, chosen by equivalence class and
    boundary. If the input space is large and structured, consider a property. If the
@@ -144,13 +144,22 @@ test depending on the implementers.
 Scope is how much real code runs in one test and where the doubles sit. The three
 values are **system**, **integration**, and **unit**, from most real code to least.
 Scope sets a test's cost, how precisely a failure points at the fault, and whether
-the test counts toward the coverage gate. Use the narrowest scope that can prove the
-claim. Every step outward costs speed, makes a failure point at more code, and moves
-the test out of the coverage gate, so a claim a unit test can prove is proved there
-and nowhere else. A test moves outward to integration or system for one of two
-reasons: the behavior it checks cannot be observed with collaborators doubled, or a
-unit test's stubs assume something about a real collaborator that only running the
-real collaborator can confirm.
+the test is in the coverage run. Use the narrowest scope that can prove the claim.
+Every step outward costs speed and makes a failure point at more code, so a claim a
+unit test can prove is proved there and nowhere else. A test moves outward to
+integration or system for one of two reasons: the behavior it checks cannot be
+observed with collaborators doubled, or a unit test's stubs assume something about a
+real collaborator that only running the real collaborator can confirm.
+
+**The coverage run.** Code counts as covered only by tests at the narrowest scope that
+can run it, and the coverage run is those tests. It must reach 100% line and branch
+coverage, and no other run counts toward that gate. For most code the narrowest scope
+is unit. The exception is **framework-bound code**: code whose behavior exists only
+inside a framework and its database, such as a Rails model or controller, which a unit
+test could reach only by doubling the framework. Its narrowest scope is integration,
+so its integration tests cover its conditional paths and are in the coverage run. A
+wider test never counts for code a narrower scope can reach: it ran the lines without
+being responsible for them, and counting it hides the gaps the gate exists to find.
 
 Cohn's test pyramid is the usual picture of the result: many unit tests, fewer
 integration tests, few system tests, because cost rises and failure precision falls
@@ -186,7 +195,9 @@ They mean the same thing.
 
 **Real and doubled.** Everything is real: every class, every dependency, the
 database, the filesystem, the network, the browser or the command-line entry point.
-Nothing is doubled.
+Nothing in the application is doubled. A third-party service the team does not run,
+such as a payment provider, is the usual exception: a sandbox or a fake replaces it at
+the network edge, and what the replacement fakes is not proved.
 
 **When to choose it.** When the question is "does the shipped software do the job",
 and no narrower test can answer it because the behavior depends on how all the pieces
@@ -228,19 +239,33 @@ a place no other example can reach, and removes it when the example ends whether
 assertions passed or not. No test reads state it did not create, and no test writes
 to state that others read.
 
+Owning the state means owning the environment around it, and the environment is wider
+here than for a unit test. Anything the process shares, the working directory and the
+environment among it, is read by every thread in that process, so a test that changes it
+is not isolated however carefully it restores it. Anything the test reads but did not
+create, including a file left where other tests reach it, is a result it cannot account
+for; a fixture read and never written is input rather than state, and [Test
+data](#test-data) says when one earns its place. And the dependency at the end of the
+path is a program, not a library: what it does varies by version and by platform, so a
+test that does not pin what it takes from the machine is measuring the machine, and a
+suite whose coverage depends on the version that happens to be installed is measuring it
+too.
+
 **When to choose it.** When the risk is in a seam: wrong argument order between two
 layers, a return shape one layer produces and the next misreads, an encoding
 assumption that holds in one place and not another. Unit tests cannot find these
 because each side of the seam is doubled from the other's point of view.
+
+Also for [framework-bound code](#test-types), where integration is the narrowest
+scope: its integration tests cover its conditional paths, as unit tests do for other
+code, and are in the coverage run.
 
 Also to confirm what a unit test's stubs assume. A stub encodes a belief about what
 the real collaborator returns, and a verifying double checks only that the method
 exists, not what it returns. Rainsberger calls the unit tests collaboration tests and
 the tests that confirm their stubs contract tests; one integration test per stubbed
 return shape is what keeps a solitary unit suite honest. Without it, a stub can
-describe a value the collaborator never produces while both suites stay green. Under
-the sociable school there are fewer stubs, and this reason applies only to the doubles
-that remain.
+describe a value the collaborator never produces while both suites stay green.
 
 **What it proves.** That the layers in the path agree with each other and with the
 real dependency at the end. It does not prove each layer's conditional paths; that is
@@ -257,38 +282,48 @@ paying the integration-test cost.
 ### Unit tests
 
 **Definition.** A unit test exercises one unit, a class or module, through its public
-interface, with collaborators doubled as the unit test school in force requires.
+interface, with its non-trivial collaborators doubled.
 
 Two schools disagree about the doubling, and Fowler names the styles. A solitary unit
-test replaces every collaborator with a double; this is the London or mockist school.
+test replaces every non-trivial collaborator with a double; this is the London or
+mockist school.
 A sociable unit test uses real in-process collaborators and doubles only what is
 slow, non-deterministic, or outside the process; this is the classical or Detroit
 school. Khorikov argues for sociable tests, because doubles for in-process
 collaborators couple the test to the implementation.
 
-The default in this guide is solitary. A suite that must prove every conditional path
+This guide documents solitary unit tests. A suite that must prove every conditional path
 in every unit needs failures that point at one unit, and a sociable test spreads a
 failure across every class in the call chain. The cost is the coupling Khorikov
 describes, and the [Verification](#verification) dimension limits it by reserving
 mocks for messages that are the behavior under test.
 
-**Unit test school** is the override point. A project that chooses sociable tests
-states it in its override file, and the entries that depend on the school, marked
-below and under [Choosing a test](#choosing-a-test) and
-[Integration tests](#integration-tests), say what changes. Nothing else in this guide
-depends on the choice.
+**Sociable unit tests are not documented.** They are named here so the choice is made
+knowingly. Every rule about doubles in this guide, and in the standards skills built on
+it, assumes a solitary test. A project that chooses sociable tests writes that guidance
+itself.
 
 **Real and doubled.** The unit under test is real. Verifying stubs replace
 non-trivial collaborators, meaning anything with behavior worth testing on its own. A
 mock replaces a collaborator only when the message to it is the behavior under test,
-as the [Verification](#verification) dimension explains. Trivial values such as
-strings, hashes, arrays, and other standard library objects with no behavior of their
-own are passed in as they are; doubling them adds noise without adding isolation. No
-external state: no filesystem, no subprocess, no network, no clock.
+as the [Verification](#verification) dimension explains. Three kinds of collaborator
+run for real:
 
-Under the sociable school, real in-process collaborators take the place of the stubs.
-Doubles remain for anything slow, non-deterministic, or outside the process, and the
-rules on trivial values and external state are unchanged.
+- Values with no behavior beyond their fields: strings, hashes, arrays, other
+  standard library objects, and data objects such as a `Struct` or a class of
+  attribute readers. Frozen or not makes no difference; with no behavior, there is
+  nothing a double would isolate.
+- Value objects, immutable and free of IO, such as a `Money` or a date range. These
+  have behavior and often a spec of their own, but the same inputs always give the
+  same result, so running them costs no isolation. Immutability matters here: a
+  mutable object with behavior is a collaborator.
+- The unit's private helpers: classes it marks `private_constant`, or nests and uses
+  nowhere else, that do no IO. A helper is part of the unit. It has no spec of its
+  own, and the unit's specs cover its lines. Stubbing it would tie the specs to how
+  the unit is divided inside, so extracting a helper during a refactor would break
+  them. A helper that another class starts using is a collaborator from then on.
+
+No external state: no filesystem, no subprocess, no network, no clock.
 
 **When to choose it.** For every conditional path in the unit. This is the default
 scope, and the question "which scope should this test be" starts here. It moves
@@ -299,7 +334,8 @@ return, for every conditional path. It does not prove that the collaborators ret
 that, or that the doubles match the real interface beyond what verifying doubles
 check. Those are integration-test facts.
 
-The unit tests alone must reach 100% line and branch coverage of the code they cover.
+Unit tests are the [coverage run](#test-types) for all code that is not
+framework-bound: they alone must reach 100% line and branch coverage of it.
 Integration and system tests add confidence about seams and environments, but they do
 not count toward that gate, and a branch that only an integration test reaches is a
 gap in the unit tests. Coverage says a line ran, not that a test would fail if the
@@ -349,6 +385,11 @@ where off-by-one mistakes live: zero, one, the maximum, one past it. Decision ta
 enumerate the combinations of conditions a method branches on so that no combination
 is skipped. Together they turn "I thought of these cases" into "these are the cases,
 and here is why there are no others".
+
+A boundary case lives beside the normal case for the same method and condition, not
+in a separate group of edge cases at the end. The reader should see a class and its
+edges together, and a group named "edge cases" says nothing about which condition
+each one is an edge of.
 
 #### Contract tests
 
@@ -723,9 +764,9 @@ per-type sections above do not repeat them.
   seam, change it inside a hook that restores it even when the example fails. Even
   restored, the mutation is visible to any thread running in the process at the time,
   including threads started by an earlier example, so this is a last resort.
-- **Non-determinism** from the clock, random values, or thread timing that the test
-  does not control. Fix the seed, inject the clock, and synchronize on an event
-  rather than a delay.
+- **Non-determinism** from the clock, random values, the order a directory listing
+  returns, or thread timing that the test does not control. Fix the seed, inject the
+  clock, sort the listing, and synchronize on an event rather than a delay.
 - **Conditional logic in a test.** An `if`, a loop, or a `rescue` inside an example
   means the example tests different things on different runs and can itself be wrong.
   Each branch of the conditional is its own example.
@@ -738,9 +779,12 @@ per-type sections above do not repeat them.
   reader trusts when the example is collapsed or listed in a failure report.
 - **Error assertions without a message pattern.** Checking the class alone lets a
   different failure with the same class pass. Match the class and a message pattern.
-- **Committed skip or focus markers.** A pending example that never gets un-pended is
-  a test that silently stopped running. A focus marker that reaches the main branch
-  turns off the rest of the suite. Both are review findings, not style.
+- **Committed skip or focus markers.** An unconditional pending example that never
+  gets un-pended is a test that silently stopped running. A focus marker that reaches
+  the main branch turns off the rest of the suite. Both are review findings, not
+  style. A guard that skips on a stated condition, such as a dependency older than the
+  feature under test, is not one of these: it names why it skipped and it runs
+  everywhere the condition holds.
 - **Test logic in production code.** A code path, setter, or environment check that
   exists only so a test can reach something. A seam added for testability must be a
   real improvement to the design, such as a parameter with a sensible default, not a
@@ -791,11 +835,14 @@ in what the subject is and how it is set up.
 
 **Definition.** A class unit test exercises one class through its public interface.
 The spec has one top-level `describe` for the class and one nested `describe` per
-public method, and the spec file's path mirrors the source file's path.
+public method, and the spec file's path mirrors the source file's path, so the spec
+for any class can be found without searching. The file loads the suite's helper and
+the source file under test and nothing else. Every other require is a coupling: a
+rename or move elsewhere in the codebase breaks a spec that never tested that code.
 
-**Real and doubled.** Only the class under test is real. Non-trivial collaborators
-are stubbed and trivial values are passed in as they are, as described under [Unit
-tests](#unit-tests). No external state.
+**Real and doubled.** The class under test and its private helpers are real.
+Non-trivial collaborators are stubbed and trivial values are passed in as they are,
+as described under [Unit tests](#unit-tests). No external state.
 
 **When to choose it.** When the code under test is a class. This is the shape most
 units take and the one the other two are measured against.
@@ -861,6 +908,25 @@ pure, this is often the shape with the fewest doubles.
 `module_function` through an includer, which mixes this shape with a mixin test and
 muddies what failed.
 
+### Structure and naming in RSpec
+
+The shapes above are written in RSpec's three nested groups. `describe` names what is
+tested: the class at the top, then one block per public method, prefixed `#` for
+instance methods and `.` for class methods. `context` names a condition, and its
+description starts with "when", "with", or "without" so that the nesting reads as a
+sentence. `it` states one expected behavior, in words that match the assertion. A
+method with a single path and no conditions worth naming puts its `it` directly
+under `describe`.
+
+Lazy evaluation means declaration order carries no meaning for RSpec: a `let` may be
+defined after the `subject` that uses it and still resolve. So the order a spec is
+written in is a convention kept for the reader, who should meet the call under test
+before its inputs, and see a condition change only the input it is about. A `subject`
+buried under its inputs, or a `context` that redefines everything, hides what the
+example is about. Writing the construction once, where several methods build the
+instance the same way, is that argument applied to change: one place to edit when the
+constructor moves.
+
 ### Doubles in RSpec
 
 The construct that produces each kind of double under [Test doubles](#test-doubles):
@@ -882,9 +948,9 @@ only appropriate as a dummy.
 - **State-based.** A matcher on the subject or a collaborator after the action:
   `expect(obj.attr).to eq(...)`, `change { ... }`, or a matcher on a fake's contents.
 - **Communication-based.** `expect(obj).to receive(:msg)` before the action, or
-  `expect(obj).to have_received(:msg)` after it. Rule 19 in the unit testing
-  standards enforces the default: `allow` for incidental stubs, `expect` only for a
-  message that is the behavior under test.
+  `expect(obj).to have_received(:msg)` after it. The RSpec base standards' rule on
+  `allow` and `expect` enforces the default: `allow` for incidental stubs,
+  `expect` only for a message that is the behavior under test.
 
 ### Gems
 
@@ -965,13 +1031,16 @@ are choices the author still makes inside any of them.
 Model specs test an ActiveRecord or ActiveModel class: validations, associations,
 scopes, callbacks, and business methods. They usually run against a real test
 database, so despite the name they are closer to integration tests than to class unit
-tests.
+tests. A model is framework-bound code, so its model spec covers every conditional path
+and is in the coverage run.
 
 ### Request specs
 
 Request specs send a full HTTP request through routing and the middleware stack and
 assert on the response body, status, headers, and any side effects. Current
-`rspec-rails` recommends them for testing HTTP behavior.
+`rspec-rails` recommends them for testing HTTP behavior. A controller is
+framework-bound code, so its request specs cover each action's conditional paths and
+are in the coverage run.
 
 ### Feature and system specs
 
@@ -1019,7 +1088,8 @@ Controller specs instantiate a controller and call an action directly, then asse
 assigned instance variables, the rendered template name, and the response status.
 Rails 5 deprecated this approach in favor of request specs because it bypasses
 routing and middleware and asserts on internals that request specs do not need to
-know about.
+know about. New work goes in request specs; existing controller specs stay in the
+coverage run until request specs replace them.
 
 ### Generator specs
 
