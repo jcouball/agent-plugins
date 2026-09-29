@@ -79,6 +79,9 @@ Code.
 
 ### jcouball-testing
 
+The plugin's [README](plugins/testing/README.md) says which skill holds the rules for
+which kind of spec.
+
 | Component | Name | What it does |
 | --- | --- | --- |
 | Skill | `testing-guide` | Points at the plugin's [testing guide](plugins/testing/docs/testing-guide.md), which defines the vocabulary for talking about tests, classifies them on six dimensions, and says which kind to write, with sections mapping it to Ruby, RSpec, and Rails. Loaded when asked why a testing rule exists or what a term means, not for ordinary test writing. |
