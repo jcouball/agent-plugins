@@ -5,6 +5,11 @@ description: 'Rules for RSpec unit specs, on top of the scope-neutral rspec-base
 
 # RSpec unit testing standards
 
+A unit spec proves that one unit does the right thing on every conditional path,
+given what its collaborators return. When it fails, the failure points at that unit
+and nothing else. It does not prove that the collaborators return what the doubles
+say; integration specs prove that. Guide: [Unit tests](../../docs/testing-guide.md#unit-tests).
+
 What a unit spec requires beyond the conventions every spec follows. A unit is a
 class, a module mixed into a host, a module of functions, or, in a Rails app, a
 component the guide's [Rails spec types](../../docs/testing-guide.md#rails-spec-types)
