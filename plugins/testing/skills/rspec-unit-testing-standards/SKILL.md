@@ -72,8 +72,8 @@ Then, for each unit spec written or reviewed:
 2. The spec requires the spec helper and the file under test, nothing else (Rule 2).
 3. Setup stays in the file; a `shared_context` only for substantial reuse across
    three or more files (Rule 3).
-4. Every non-trivial collaborator is stubbed, and trivial values are passed as they
-   are (Rule 4).
+4. Every non-trivial collaborator is stubbed; plain values, data objects, value
+   objects, and the class's private helpers run for real (Rule 4).
 5. Unit specs alone cover every line and branch of the unit (Rule 5).
 6. No real time, randomness, sleep, or external process timing, and no change to
    `ENV`, the working directory, or any global (Rules 6, 7).
@@ -121,12 +121,20 @@ different doubles or defaults, the similarity is incidental. A unit spec that ne
 
 ### Rule 4 (MUST): Stub every non-trivial collaborator; pass trivial values as they are
 
-Stub anything whose real involvement would cross the unit boundary: a subprocess, the
-filesystem, the network, the clock, or another class with behavior of its own. Do
-not stub strings, numbers, arrays, hashes, or a value object with no IO. The
-question is whether running the real thing would stop this being a unit test. This
-is the solitary school. Sociable unit tests, which run in-process collaborators for
-real, are not documented here or in the guide. Guide:
+Stub a subprocess, the filesystem, the network, the clock, and every class with
+behavior worth testing on its own. Three kinds of collaborator run for real:
+
+- Values with no behavior beyond their fields: strings, numbers, arrays, hashes, and
+  data objects such as a `Struct`, frozen or not.
+- Value objects, immutable and free of IO, such as a `Money`, even when they have a
+  spec of their own.
+- The class's private helpers: classes it marks `private_constant`, or nests and uses
+  nowhere else, that do no IO. The class's specs cover them, and they get no spec of
+  their own. A helper that another class starts using is a collaborator from then
+  on.
+
+This is the solitary school. Sociable unit tests, which also run in-process classes
+with specs of their own for real, are not documented here or in the guide. Guide:
 [Unit tests](../../docs/testing-guide.md#unit-tests), real and doubled.
 
 ## Coverage

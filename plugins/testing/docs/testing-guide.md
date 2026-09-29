@@ -82,8 +82,9 @@ The rest of this guide explains the choices. This is the order to make them in.
    collaborator is the behavior and nothing in the process records it. See
    [Verification](#verification).
 3. **Doubles.** Stub every non-trivial collaborator with a verifying double. Pass
-   strings, hashes, and other plain values as they are, and reach for a fake when the
-   collaborator's state is what the test reads. This is the solitary school, the only
+   plain values, data objects, and value objects as they are, and let the unit's
+   private helpers run. Reach for a fake when the collaborator's state is what the
+   test reads. This is the solitary school, the only
    one this guide documents. See [Test doubles](#test-doubles)
    and [Unit tests](#unit-tests).
 4. **Cases.** One example per conditional path, chosen by equivalence class and
@@ -305,11 +306,24 @@ itself.
 **Real and doubled.** The unit under test is real. Verifying stubs replace
 non-trivial collaborators, meaning anything with behavior worth testing on its own. A
 mock replaces a collaborator only when the message to it is the behavior under test,
-as the [Verification](#verification) dimension explains. Trivial values are passed in
-as they are: strings, hashes, arrays, and other standard library objects with no
-behavior of their own, and value objects, immutable and free of IO, such as a `Money`
-or a date range. Doubling them adds noise without adding isolation. No
-external state: no filesystem, no subprocess, no network, no clock.
+as the [Verification](#verification) dimension explains. Three kinds of collaborator
+run for real:
+
+- Values with no behavior beyond their fields: strings, hashes, arrays, other
+  standard library objects, and data objects such as a `Struct` or a class of
+  attribute readers. Frozen or not makes no difference; with no behavior, there is
+  nothing a double would isolate.
+- Value objects, immutable and free of IO, such as a `Money` or a date range. These
+  have behavior and often a spec of their own, but the same inputs always give the
+  same result, so running them costs no isolation. Immutability matters here: a
+  mutable object with behavior is a collaborator.
+- The unit's private helpers: classes it marks `private_constant`, or nests and uses
+  nowhere else, that do no IO. A helper is part of the unit. It has no spec of its
+  own, and the unit's specs cover its lines. Stubbing it would tie the specs to how
+  the unit is divided inside, so extracting a helper during a refactor would break
+  them. A helper that another class starts using is a collaborator from then on.
+
+No external state: no filesystem, no subprocess, no network, no clock.
 
 **When to choose it.** For every conditional path in the unit. This is the default
 scope, and the question "which scope should this test be" starts here. It moves
@@ -826,9 +840,9 @@ for any class can be found without searching. The file loads the suite's helper 
 the source file under test and nothing else. Every other require is a coupling: a
 rename or move elsewhere in the codebase breaks a spec that never tested that code.
 
-**Real and doubled.** Only the class under test is real. Non-trivial collaborators
-are stubbed and trivial values are passed in as they are, as described under [Unit
-tests](#unit-tests). No external state.
+**Real and doubled.** The class under test and its private helpers are real.
+Non-trivial collaborators are stubbed and trivial values are passed in as they are,
+as described under [Unit tests](#unit-tests). No external state.
 
 **When to choose it.** When the code under test is a class. This is the shape most
 units take and the one the other two are measured against.
