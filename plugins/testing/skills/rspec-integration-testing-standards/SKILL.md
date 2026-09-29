@@ -5,6 +5,12 @@ description: 'Rules for RSpec integration specs: when a seam earns one, one spec
 
 # RSpec integration testing standards
 
+An integration spec proves that the layers in a path agree with each other and with
+the real dependency at the end. It does not prove each layer's conditional paths;
+unit specs prove those, except in framework-bound code, which only an integration
+spec can reach (Rule 13). Guide:
+[Integration tests](../../docs/testing-guide.md#integration-tests).
+
 Rules for writing and reviewing RSpec integration specs: tests that run several real
 components together down to a real external process, service, or filesystem, short of
 the whole system. Integration specs live under `spec/integration`, or in a Rails app

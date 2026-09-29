@@ -5,6 +5,10 @@ description: 'Rules for RSpec system specs, on top of the rspec-base-standards s
 
 # RSpec system testing standards
 
+A system spec proves that one end-to-end path works in an environment like the one
+users have. It does not say which component failed, and it proves nothing about
+conditions it did not set up. Guide: [System tests](../../docs/testing-guide.md#system-tests).
+
 Rules for writing and reviewing RSpec system specs: tests that drive the whole
 application from the outside, the way a user or a calling process would. In a Rails
 app these are system and feature specs, driven through a browser with Capybara; for a
