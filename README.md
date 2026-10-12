@@ -89,6 +89,7 @@ which kind of spec.
 | Skill | `rspec-unit-testing-standards` | What a spec requires because it is a unit spec: the constructor, what it may require and stub, the coverage gate, determinism, mixins and module functions, and the Rails unit-scope spec types. |
 | Skill | `rspec-integration-testing-standards` | What a spec requires because it runs real components down to a real external process: which seams earn one, what to assert, owning temporary state, and portability. |
 | Skill | `rspec-system-testing-standards` | What a spec requires because it drives the whole application from outside: which journeys earn one, one scenario per example, nothing in the application doubled, waiting instead of sleeping, and state the app server can see. |
+| Skill | `tdd-refactor-step` | The refactor step of red-green-refactor: which smells oblige a change, the smallest technique that removes each, and how to prove the behavior did not move. |
 
 ### jcouball-marketplace
 
