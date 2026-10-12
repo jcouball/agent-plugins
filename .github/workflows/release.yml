@@ -21,6 +21,16 @@ on:
 
   workflow_dispatch:
 
+# Runs queue instead of overlapping. Release pull requests merged a few seconds
+# apart each start a run, and overlapping runs each find the same merged pull
+# requests and race: two of them create the same GitHub release, and another
+# fails removing a label a faster run already removed. A queued run that is
+# still waiting when a newer one arrives is cancelled, which loses nothing,
+# because the run that goes next releases every merged release pull request.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
 jobs:
   plugins:
     name: List plugins
