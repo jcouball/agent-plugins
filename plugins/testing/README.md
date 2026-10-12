@@ -38,7 +38,7 @@ to name the subject, lay out `describe`, `context`, and `it`, use `subject` and
 
 Where a scope's standards change a base rule, they say so.
 
-The skills are for writing a spec and for reviewing or auditing existing ones. A
+The standards skills are for writing a spec and for reviewing or auditing existing ones. A
 review or audit produces a table with one row per rule, marked Pass, Fail, or N/A,
 then the MUST violations to fix and the SHOULD deviations ordered by impact.
 
@@ -48,12 +48,15 @@ only with a documented exception. A SHOULD is the default. Set it aside when a c
 test needs it, and say why in a comment. Where the guide reasons about a rule, the rule
 links to that paragraph.
 
-## Refactoring
+## Debugging and refactoring
 
-[TDD refactor step](skills/tdd-refactor-step/SKILL.md) applies the standards to a task
-instead of stating rules of its own. It is the refactor step of red-green-refactor:
-which smells oblige a change, the smallest technique that removes each, and how to
-prove the behavior did not move. It loads the standards for the spec it changes.
+These skills apply the standards to a task rather than describing a kind of spec.
+[Test debugging](skills/test-debugging/SKILL.md) works a failing or flaky test from
+reproduction to a verified fix, choosing the fix by what caused the failure.
+[TDD refactor step](skills/tdd-refactor-step/SKILL.md) is the refactor step of
+red-green-refactor: which smells oblige a change, the smallest technique that removes
+each, and how to prove the behavior did not move. Both load the standards for the
+spec they change.
 
 ## Adapting the rules to a project
 
