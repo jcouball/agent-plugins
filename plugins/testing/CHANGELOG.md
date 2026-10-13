@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/jcouball/agent-plugins/compare/testing-v0.2.0...testing-v0.2.1) (2026-10-13)
+
+
+### Features
+
+* **testing:** Add the tdd-refactor-step skill ([13d7d93](https://github.com/jcouball/agent-plugins/commit/13d7d93aefb378a0d9b87c3b808c530b26c26a64))
+* **testing:** Add the test-debugging skill ([2f2a940](https://github.com/jcouball/agent-plugins/commit/2f2a94020dd129eec4176a5c3af1314d5174756a))
+
 ## [0.2.0](https://github.com/jcouball/agent-plugins/compare/testing-v0.1.0...testing-v0.2.0) (2026-10-11)
 
 
