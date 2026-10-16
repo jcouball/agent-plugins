@@ -49,3 +49,34 @@ jobs:
 
       - name: Lint markdown
         run: npm run lint:markdown
+
+      - name: Test the worktrees hooks
+        run: npm run test:worktrees
+
+  # A job of its own because it is the slowest check, and it needs none of the
+  # lint job's dependencies: bash, git, jq, and Node, all on the runner.
+  #
+  # On both platforms the plugin supports. The battery runs both suites on the
+  # unmutated hooks before it mutates anything, so this is also where the hook
+  # tests run on macOS; the shell tools differ there in ways that have mattered.
+  mutate:
+    name: Mutation Test Worktrees Hooks (${{ matrix.os }})
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Mutation test the worktrees hooks
+        run: npm run test:worktrees:mutate
