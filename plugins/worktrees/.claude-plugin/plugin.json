@@ -1,0 +1,17 @@
+{
+  "name": "jcouball-worktrees",
+  "version": "0.1.0",
+  "description": "Worktree placement. A WorktreeCreate hook puts the worktrees Claude Code makes in a .worktrees directory beside the repository's main worktree rather than in .claude/worktrees inside it, so a repository's linters and file walkers never descend into another branch's files. A WorktreeRemove hook takes them away again.",
+  "author": {
+    "name": "James Couball"
+  },
+  "homepage": "https://github.com/jcouball/agent-plugins",
+  "repository": "https://github.com/jcouball/agent-plugins",
+  "license": "MIT",
+  "keywords": [
+    "git",
+    "worktree",
+    "hooks",
+    "isolation"
+  ]
+}

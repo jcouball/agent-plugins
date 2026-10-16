@@ -1,0 +1,27 @@
+{
+  "description": "Creates Claude Code worktrees beside the repository's main working tree instead of inside the project.",
+  "hooks": {
+    "WorktreeCreate": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '${CLAUDE_PLUGIN_ROOT}/bin/worktree-create'",
+            "timeout": 600
+          }
+        ]
+      }
+    ],
+    "WorktreeRemove": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash '${CLAUDE_PLUGIN_ROOT}/bin/worktree-remove'",
+            "timeout": 600
+          }
+        ]
+      }
+    ]
+  }
+}

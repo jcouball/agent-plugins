@@ -26,6 +26,7 @@ The `jcouball-marketplace` plugin ships commands for setting that up.
 /plugin install jcouball-github@jcouball
 /plugin install jcouball-marketplace@jcouball
 /plugin install jcouball-testing@jcouball
+/plugin install jcouball-worktrees@jcouball
 ```
 
 Run these once per machine. They are Claude Code slash commands. The VS Code
@@ -38,6 +39,7 @@ claude plugin install jcouball-writing@jcouball
 claude plugin install jcouball-github@jcouball
 claude plugin install jcouball-marketplace@jcouball
 claude plugin install jcouball-testing@jcouball
+claude plugin install jcouball-worktrees@jcouball
 ```
 
 ## Update
@@ -48,6 +50,7 @@ claude plugin update jcouball-writing@jcouball
 claude plugin update jcouball-github@jcouball
 claude plugin update jcouball-marketplace@jcouball
 claude plugin update jcouball-testing@jcouball
+claude plugin update jcouball-worktrees@jcouball
 ```
 
 Refresh the marketplace first. Without it, `update` reads a stale cache and
@@ -91,6 +94,22 @@ which kind of spec.
 | Skill | `rspec-system-testing-standards` | What a spec requires because it drives the whole application from outside: which journeys earn one, one scenario per example, nothing in the application doubled, waiting instead of sleeping, and state the app server can see. |
 | Skill | `tdd-refactor-step` | The refactor step of red-green-refactor: which smells oblige a change, the smallest technique that removes each, and how to prove the behavior did not move. |
 | Skill | `test-debugging` | Works a failing or flaky test from reproduction to verified fix, choosing the fix by what caused the failure rather than by what makes the test pass. |
+
+### jcouball-worktrees
+
+| Component | Name | What it does |
+| --- | --- | --- |
+| Hook | `WorktreeCreate` | Creates the worktree Claude Code asked for at `<working-tree>.worktrees/<name>`, beside the project rather than in `.claude/worktrees/<name>` inside it, on a branch off the remote's default. |
+| Hook | `WorktreeRemove` | Removes that worktree when the session leaves it, takes the container with it once the last one goes, and keeps the branch. |
+
+No skills and no commands: installing it changes where worktrees land and
+nothing else. A hook replaces the whole creation step, so some of what Claude
+Code does for a worktree of its own stops happening.
+[What the plugin does not do](plugins/worktrees/docs/worktrees.md#what-the-plugin-does-not-do)
+is the list, submodules among them, and the rest of that page covers the `jq`
+and git version requirements. It runs on macOS and Linux only; on Windows its
+hooks refuse to run, which blocks worktree creation, so leave it disabled
+there.
 
 ### jcouball-marketplace
 
