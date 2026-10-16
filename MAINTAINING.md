@@ -16,6 +16,9 @@ plugins/<plugin>/
   .claude-plugin/plugin.json        the plugin manifest, declares its skills
   skills/<skill>/SKILL.md           one directory per skill
   commands/<command>.md             one file per slash command
+  hooks/hooks.json                  the plugin's hooks, discovered by path
+  bin/<name>                        executables the plugin's hooks run
+  test/                             what tests those executables, if any
 scripts/                            the checks, their tests, the local install
                                     helper, and probe-github-rendering.mjs
   lib/                              the checks' code, which the tests import
@@ -168,7 +171,10 @@ the manifest without doing either gets 1.0.0.
 npm run ci
 ```
 
-Six checks, each runnable on its own:
+Eight checks, each runnable on its own. `npm run ci` runs seven of them: it
+leaves out `npm run test:worktrees`, because the mutation battery runs both
+hook suites unmutated before anything else and stops, showing their output, if
+they fail.
 
 - `npm test` runs the tests for the check scripts themselves, with Node's
   built-in test runner. The anchors the link check's tests expect are kept in
@@ -199,9 +205,33 @@ Six checks, each runnable on its own:
   Command files get their own nested config that drops the first-line-heading
   rule, since they are prompts, not documents.
 - `npm run lint:commits` runs commitlint over the commits not yet on `main`.
+- `npm run test:worktrees` runs the worktrees plugin's hook tests, which are
+  plain bash: [`plugins/worktrees/test/run.sh`](plugins/worktrees/test/run.sh)
+  drives one suite per hook. Each builds throwaway repositories under its own
+  temporary directory, with git's global and system configuration replaced so
+  the result does not depend on the machine it runs on, and takes them away
+  again. `BIN` points a suite at another copy of the hooks, which is how a
+  suite is run against the revision before a fix to confirm it would have
+  caught it.
+- `npm run test:worktrees:mutate` checks that those tests would catch a
+  broken hook. [`mutate.mjs`](plugins/worktrees/test/mutate.mjs) breaks one
+  thing at a time, each one or more literal strings replaced in a file under
+  `bin/`, and runs the suites against every broken copy; a mutation they pass
+  is a hole in them. Every mutation is checked against those files before
+  anything runs, so editing a hook out from under its mutations fails the check
+  rather than quietly testing nothing, and the few mutations nothing can catch
+  are listed as expected survivors with the reason. Arguments filter by label,
+  `MUTATE_JOBS` caps the parallelism, and a full run takes about a minute.
 
-CI runs the same checks in two jobs, `Lint and Validate` and
-`Verify Conventional Commits`.
+CI runs the same checks in `Lint and Validate`, `Verify Conventional Commits`,
+and `Mutation Test Worktrees Hooks`. The last runs on Ubuntu and on macOS, the
+two platforms the worktrees plugin supports, and since the battery runs both
+suites unmutated first, it is also what tests the hooks on macOS. The branch
+ruleset requires only the first two.
+
+A change to a worktrees hook usually moves some mutation's anchor, and the
+check then names the mutations to update. Update them in the same commit as
+the hook, and add one for any new behavior worth protecting.
 
 The link check copies three things from GitHub's rendering: the anchor each
 case expects, the HTML elements GitHub's sanitizer keeps, and the link schemes
@@ -210,6 +240,10 @@ API and reports any that GitHub now renders differently. It needs an
 authenticated `gh` and the network, so CI does not run it. Run it after adding
 a case, and when the link check reports a link that works on GitHub or passes
 one that does not.
+
+A plugin that ships executables tests them; one that ships only markdown has
+nothing to run. There is no shared runner to join and no plugin is expected to
+grow tests because another one has them.
 
 ## Adding a skill
 
@@ -240,6 +274,27 @@ Drop the file in `plugins/<plugin>/commands/<name>.md`. Commands are
 discovered by directory and are not declared in the manifest. They report
 under Skills in `claude plugin details`, which is a display grouping and not
 an error.
+
+## Adding a hook
+
+Drop the file in `plugins/<plugin>/hooks/hooks.json`. Hooks are discovered by
+path and are not declared in the manifest, the same as commands. The file is an
+object with a `description` and a `hooks` key holding what the `hooks` key in
+`settings.json` holds, and `${CLAUDE_PLUGIN_ROOT}` expands to the installed
+plugin directory, which is the only way a hook can name a script the plugin
+ships. Only `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_PROJECT_DIR}`, and
+`${CLAUDE_PLUGIN_DATA}` expand; any other `$...`, a backtick, or `%NAME%` is
+refused.
+
+A hook is the one thing a plugin installs with no visible surface. A skill
+appears in the skills list and a command in the slash menu, while a hook only
+changes what happens. So a plugin that ships one holds nothing else worth
+installing on its own — otherwise someone installs it for the skill and gets
+the behavior change unasked — and it is named for the behavior rather than for
+the tool it drives. The worktrees plugin is the worked example.
+
+Hooks load only while their plugin is enabled, and editing them needs
+`/reload-plugins` or a restart, like any other plugin change.
 
 ## Adding a plugin
 
