@@ -16,6 +16,9 @@ plugins/<plugin>/
   .claude-plugin/plugin.json        the plugin manifest, declares its skills
   skills/<skill>/SKILL.md           one directory per skill
   commands/<command>.md             one file per slash command
+  hooks/hooks.json                  the plugin's hooks, discovered by path
+  bin/<name>                        executables the plugin's hooks run
+  test/                             what tests those executables, if any
 scripts/                            the checks, their tests, the local install
                                     helper, and probe-github-rendering.mjs
   lib/                              the checks' code, which the tests import
@@ -211,6 +214,10 @@ authenticated `gh` and the network, so CI does not run it. Run it after adding
 a case, and when the link check reports a link that works on GitHub or passes
 one that does not.
 
+A plugin that ships executables tests them; one that ships only markdown has
+nothing to run. There is no shared runner to join and no plugin is expected to
+grow tests because another one has them.
+
 ## Adding a skill
 
 Run `/jcouball-marketplace:add-skill` with the plugin and skill name;
@@ -240,6 +247,27 @@ Drop the file in `plugins/<plugin>/commands/<name>.md`. Commands are
 discovered by directory and are not declared in the manifest. They report
 under Skills in `claude plugin details`, which is a display grouping and not
 an error.
+
+## Adding a hook
+
+Drop the file in `plugins/<plugin>/hooks/hooks.json`. Hooks are discovered by
+path and are not declared in the manifest, the same as commands. The file is an
+object with a `description` and a `hooks` key holding what the `hooks` key in
+`settings.json` holds, and `${CLAUDE_PLUGIN_ROOT}` expands to the installed
+plugin directory, which is the only way a hook can name a script the plugin
+ships. Only `${CLAUDE_PLUGIN_ROOT}`, `${CLAUDE_PROJECT_DIR}`, and
+`${CLAUDE_PLUGIN_DATA}` expand; any other `$...`, a backtick, or `%NAME%` is
+refused.
+
+A hook is the one thing a plugin installs with no visible surface. A skill
+appears in the skills list and a command in the slash menu, while a hook only
+changes what happens. So a plugin that ships one holds nothing else worth
+installing on its own — otherwise someone installs it for the skill and gets
+the behavior change unasked — and it is named for the behavior rather than for
+the tool it drives. The worktrees plugin is the worked example.
+
+Hooks load only while their plugin is enabled, and editing them needs
+`/reload-plugins` or a restart, like any other plugin change.
 
 ## Adding a plugin
 
