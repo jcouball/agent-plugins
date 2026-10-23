@@ -110,8 +110,8 @@ reviewed:
    (Rule 2).
 3. One example per shape the real dependency returns, plus at least one failure
    (Rules 3, 4).
-4. Assert on structure and on values the test controls, never on the dependency's
-   formatting (Rules 5, 6).
+4. Assert the values the test put in, with a shape check only in the smoke test, and
+   never the dependency's formatting (Rules 5, 6).
 5. No conditional path that a unit spec already covers (Rule 7).
 6. All state in a temporary place the example creates and removes (Rule 8).
 7. No shell, no change to `cwd`, `ENV`, or other process-wide state, no platform-only
@@ -172,10 +172,21 @@ stub is most likely to get wrong. Guide:
 
 ## Assertions
 
-### Rule 5 (MUST): Assert on the structure of the return value and on values the test controls
+### Rule 5 (MUST): Assert the values the test put in; a shape check only in the smoke test
 
-The class, the presence and type of fields, the count of entries, and the paths,
-names, and contents the example itself created. Guide:
+Assert the values the test put in, exactly: the records it created, the file it wrote,
+the message it committed. Use `have_attributes`, `include` with a specific element, or
+`contain_exactly` on those fields, not `eq` on the whole record, which also asserts on
+fields the dependency chose and so tests the dependency. A class check,
+`not_to be_empty`, a count, or `respond_to` proves only that the dependency returned
+something. One example per spec file may make that its claim: the smoke test, whose
+only assertion is that the call succeeds against the real dependency and returns the
+expected class. No other example relies on the smoke test's checks, and no other
+example uses them in place of a value. An identifier the dependency generates has no
+value the test knows: match its shape with a pattern, then use it, by handing it back
+to the dependency and asserting on what comes back, as a SHA that matches `/\h{40}/`
+and then names a commit whose message is the one the test wrote. Text the dependency
+composes is Rule 6's concern. Guide:
 [Integration tests](../../docs/testing-guide.md#integration-tests), what it proves.
 
 ### Rule 6 (MUST): Do not assert on the dependency's formatting
