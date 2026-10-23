@@ -97,6 +97,27 @@ plugin too — which is how marketplace v2.0.0 shipped a changelog describing a
 github rename. When a change spans plugin directories, split it into one
 commit per plugin so the type and the `!` land only where they apply.
 
+### Labeling an issue
+
+Every open issue carries exactly one component label saying which release it
+lands in. A component label exists for each `component` named in a
+`.release-please/*-config.json`, and for nothing else, so the label on the
+issue is the name of the tag, the changelog, and the release pull request that
+will carry it. An issue that touches no plugin directory — the checks, the
+workflows, this file — carries `no-release` instead. An issue that would span
+two plugins is two issues, for the same reason a commit is split.
+
+`breaking` is a prediction: as proposed, a spec or an override that complies
+with the shipped rules would become a violation. The commit that closes the
+issue confirms it with a `!` or revises it. The label is there so a release
+can be planned: release-please accumulates commits until the release pull
+request merges, so breaking issues landed before that merge cost one breaking
+bump — a major, or a minor while the plugin is below 1.0 — and landed one
+release apart they cost one each.
+
+`bug` and `enhancement` say what kind of change an issue asks for and stay on
+it alongside the component label.
+
 ## Releasing a change
 
 No one edits a version by hand. release-please watches `main` and keeps one
@@ -255,7 +276,10 @@ an error.
    config; without one of those the first release is 1.0.0, as
    [How release-please finds the starting point](#how-release-please-finds-the-starting-point)
    explains.
-4. Install it: `claude plugin install <plugin-name>@jcouball`.
+4. Create the issue label, named for the `component` in the config, with
+   `gh label create <name>`, as [Labeling an issue](#labeling-an-issue)
+   requires.
+5. Install it: `claude plugin install <plugin-name>@jcouball`.
 
 `claude plugin init` scaffolds a standalone plugin under `~/.claude/skills/`
 instead of adding one here. It is not the tool for this repository.
