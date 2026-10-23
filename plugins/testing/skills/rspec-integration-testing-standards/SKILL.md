@@ -79,8 +79,8 @@ additions: where its integration specs live, the helpers and shared contexts tha
 its temporary state, how it starts the external process, how its coverage run is
 configured, where the minimum dependency version is
 recorded and how its version-guard helper is defined, and its own conventions for
-particular class families. Check for one at each of these paths and use the first that
-exists:
+particular class families, which win over these rules as the shared standards' Step 0
+says. Check for one at each of these paths and use the first that exists:
 
 - `.claude/skills/rspec-integration-testing-standards/SKILL.md`
 - `.github/skills/rspec-integration-testing-standards/SKILL.md`

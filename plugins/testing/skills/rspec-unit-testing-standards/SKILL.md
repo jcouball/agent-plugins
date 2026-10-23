@@ -42,8 +42,9 @@ is the default; override it when a clearer test requires it, and say so in a com
 
 A project may carry its own thin copy of this skill holding only its local changes and
 additions: where its unit specs live, how its coverage gate is configured, which rules
-it flips, and its own conventions for particular class families. Check for one at each
-of these paths and use the first that exists:
+it flips, and its own conventions for particular class families, which win over these
+rules as the shared standards' Step 0 says. Check for one at each of these paths and
+use the first that exists:
 
 - `.claude/skills/rspec-unit-testing-standards/SKILL.md`
 - `.github/skills/rspec-unit-testing-standards/SKILL.md`

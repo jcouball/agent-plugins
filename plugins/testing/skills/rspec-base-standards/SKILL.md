@@ -59,6 +59,18 @@ additions, with the project file winning on conflict. If that file is what invok
 this skill, its changes are already in context; do not re-read it, and do not
 re-invoke anything it names.
 
+A project override may name class-family conventions: project skills that govern the
+specs of a named family of classes. A convention the override does not name has no
+standing here. A named convention is part of the project's rules for the specs it
+governs, and it may depart from a rule here in two ways. It may forbid what a rule
+permits, with no further ceremony, since the spec only gets stricter; where a stricter
+convention would force a violation of another rule, it names that rule too. It may
+prescribe what a rule forbids only where it names the rule and says why, as a stated
+exception. Where a convention displaces a rule, the per-rule table marks that rule N/A
+with the convention's name beside it; N/A without a name keeps its meaning, that the
+rule does not apply to this spec. The convention's own findings follow the table, and
+the table and the findings never disagree.
+
 If no override exists, run this skill as written.
 
 ## Checklist

@@ -64,8 +64,9 @@ with a comment saying why.
 A project may carry its own thin copy of this skill holding only its local changes and
 additions: where its system specs live, which driver runs them locally and in CI, how
 it cleans the database, which third-party services it replaces at the network edge
-and with what, and its own conventions for particular features. Check for one at each
-of these paths and use the first that exists:
+and with what, and its own conventions for particular features, which win over these
+rules as the shared standards' Step 0 says of class-family conventions. Check for one
+at each of these paths and use the first that exists:
 
 - `.claude/skills/rspec-system-testing-standards/SKILL.md`
 - `.github/skills/rspec-system-testing-standards/SKILL.md`
