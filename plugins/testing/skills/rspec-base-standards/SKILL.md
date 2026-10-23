@@ -366,9 +366,15 @@ second string proves nothing. Guide:
 A return value, a raised error, a state change, or a message to a collaborator. Before
 approving an assertion ask what change would fail only this example; if every other
 example would fail first, delete it. `not_to be_nil`, `not_to raise_error`, a test
-that a constant exists, or that a namespace is a `Module` all fail this test. So does
-an example that re-proves what a collaborator's own spec already proves: assert that
-the subject called the collaborator correctly, not that the collaborator works.
+that a constant exists, or that a namespace is a `Module` all fail this test. One
+constant test passes it: an alias kept for backward compatibility is public API that
+nothing else in the suite references, and removing it fails only its spec. That spec,
+in its own file named for the alias, asserts that the alias resolves to or behaves as
+its target, with `expect(described_class).to be(Target)` for a plain alias, or
+`expect(described_class.new).to be_a(Target)` for a deprecation proxy, which is not
+the same object. An example that re-proves what a collaborator's own spec already
+proves also fails the test: assert that the subject called the collaborator correctly,
+not that the collaborator works.
 Guide:
 [Asserting on implementation details](../../docs/testing-guide.md#test-anti-patterns),
 [A tautological test](../../docs/testing-guide.md#test-anti-patterns), and
