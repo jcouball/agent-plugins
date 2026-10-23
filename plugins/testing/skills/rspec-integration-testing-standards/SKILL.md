@@ -35,7 +35,8 @@ of each at this scope, named by subject so a renumbering there cannot repoint it
 - Requires widen: the spec may require the helpers and shared contexts that build its
   temporary state, as well as the spec helper and the file under test.
 - Shared setup is permitted: a shared context that builds temporary state is what an
-  integration spec is for, and Rule 8 below says what that state must be.
+  integration spec is for; Rule 8 below says what that state must be, and the shared
+  rule on shared contexts says what the context itself may hold.
 - Stubbing collaborators is inverted. The classes in the path and the dependency at
   its end are real; a double sits only at the outermost edge, cutting off a part of
   the system the seam under test does not reach.
