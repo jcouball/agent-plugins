@@ -33,6 +33,7 @@ is the default; override it when a clearer test requires it, and say so in a com
 - [Doubles and stubbing](#doubles-and-stubbing)
 - [Assertions](#assertions)
 - [Reliability](#reliability)
+- [Output](#output)
 - [What the tools check](#what-the-tools-check)
 
 ## Step 0: Apply project overrides
@@ -70,6 +71,14 @@ exception. Where a convention displaces a rule, the per-rule table marks that ru
 with the convention's name beside it; N/A without a name keeps its meaning, that the
 rule does not apply to this spec. The convention's own findings follow the table, and
 the table and the findings never disagree.
+
+These rules, and those of the standards for the spec's scope, bind in full every
+example and group the change under review touches, and the file-wide rules, the
+requires, the frozen-string comment, one top-level `describe`, and the spec path, bind
+as soon as any line of the file changes. An example the change does not touch may
+break a rule. Fixing it is cleanup, not a blocker for the change, and it is tracked
+where the project override says, not restated in every review. A project that wants
+the stricter policy, fix the whole file you touch, says so in its override.
 
 If no override exists, run this skill as written.
 
@@ -409,6 +418,17 @@ A class or constant declared in a spec file, at the top level or inside a group,
 persists into every later example in the process. Build a test class with `Class.new`
 in a `let`, and replace a constant with `stub_const`. Guide: [Leaky
 constants](../../docs/testing-guide.md#rspec-anti-patterns).
+
+## Output
+
+When reviewing or auditing, produce one table with one row per rule, shared and
+scope-specific, marked Pass, Fail, N/A, or Legacy, each with the issue. Fail is a
+violation the change introduced or touched. Legacy is a violation in an example the
+change did not touch; list those after the SHOULD deviations as cleanup, and add any
+not already recorded to the place the override names. N/A with a convention's name
+beside it is a rule a class-family convention displaces; N/A alone is a rule that does
+not apply to this spec. After the table: the MUST violations to fix, then the SHOULD
+deviations ordered by impact, then the Legacy rows.
 
 ## What the tools check
 
