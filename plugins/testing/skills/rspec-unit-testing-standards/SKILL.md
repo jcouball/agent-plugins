@@ -277,7 +277,7 @@ After writing or changing a spec:
 ## Output
 
 When writing, produce the spec and run the verification above. When reviewing or
-auditing, produce a table with one row per rule, marked Pass, Fail, or N/A with the
-issue, then the MUST violations to fix, then the SHOULD deviations ordered by impact.
-The table covers the shared rules as well as this skill's own; one that lists only this
-skill's rules has audited a fraction of what applies.
+auditing, produce the table and the lists that the shared standards'
+[Output](../rspec-base-standards/SKILL.md#output) section describes. The table covers
+the shared rules as well as this skill's own; one that lists only this skill's rules
+has audited a fraction of what applies.
