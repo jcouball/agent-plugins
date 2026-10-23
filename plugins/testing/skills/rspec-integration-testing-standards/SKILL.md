@@ -45,7 +45,13 @@ of each at this scope, named by subject so a renumbering there cannot repoint it
 - Determinism changes shape: the external process runs on its own clock with its own
   randomness, which no stub reaches. The spec asserts nothing those decide, per Rule 5
   below, and pins what the process would otherwise take from the machine, per Rule 11
-  below. Time and randomness inside the process are still stubbed or injected.
+  below. Time and randomness inside the process are still stubbed or injected. The
+  example never calls `sleep`; only the subject may, as a fixture process that must
+  outlive a timeout under test. To wait for the process, wait on it: `Process.wait`,
+  or read its output to end of file. To order two events in the same process, use a
+  barrier such as a `Queue`. To make two results differ in time, pass the time to the
+  dependency the way it accepts it, as git takes `--date` or a committer date in the
+  environment handed to that one command, never through `ENV`, which Rule 10 forbids.
 - Global state is restated as Rule 10 below.
 - Mixins and module functions need no rules of their own: the spec belongs to the
   class or module whose public method the example calls, per Rule 2 below.
