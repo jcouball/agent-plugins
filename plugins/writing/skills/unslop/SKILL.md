@@ -1,6 +1,6 @@
 ---
 name: unslop
-description: 'Removes AI writing tells from prose and rewrites it in plain, direct language. Use when writing or editing documentation, README and CHANGELOG entries, PR descriptions, commit message bodies, code comments, or any prose that reads as machine-generated. If the current project has its own unslop skill, that file holds project-specific changes and additions: still apply this skill, and apply those changes on top (Process step 0).'
+description: 'Removes AI writing tells from prose and rewrites it in plain, direct language, and checks a document''s sections, headings, and duplicated content. Use when writing or editing documentation, README and CHANGELOG entries, PR descriptions, commit message bodies, code comments, or any prose that reads as machine-generated. The structure rules do not apply to a SKILL.md, AGENTS.md, or CLAUDE.md. If the current project has its own unslop skill, that file holds project-specific changes and additions: still apply this skill, and apply those changes on top (Process step 0).'
 ---
 
 # Unslop
@@ -20,12 +20,24 @@ Edit text to remove AI patterns and add human voice.
 1. Identify the voice level for what is being edited (see next section).
 2. Scan for the patterns below. They apply at every voice level. A rule that
    varies by level says so.
-3. Rewrite. Preserve meaning, match intended tone.
-4. Be specific. Not "this is concerning" but "the job runs unattended at 3am
-   and nothing checks its exit code". Vague writing reads as generated at
-   every voice level, including reference.
+3. Report every finding in one list, each with its rule ID, before changing
+   anything. One finding at a time hides a pattern: three rounds can repair
+   the same pronoun before anyone notices the sentence holds two candidate
+   nouns and cannot carry a pronoun at all. When the user asked for a review,
+   the list is the deliverable; stop and wait for their decision. When the
+   user asked for an edit, or another skill or command invoked this one,
+   continue to the next step without pausing.
+4. Rewrite. Preserve meaning, match intended tone. Be specific. Not "this is
+   concerning" but "the job runs unattended at 3am and nothing checks its
+   exit code". Vague writing reads as generated at every voice level,
+   including reference.
 5. Apply the voice level.
-6. Self-audit: "What makes this obviously AI generated?" Fix remaining tells.
+6. Self-audit with two questions. "What makes this obviously AI generated?"
+   Fix remaining tells. Then, for anything moved or retitled, read the moved
+   passage under its new heading on its own. A passage correct under its old
+   heading loses its subject under a new one: "It also needs `jq`" read
+   correctly under a heading containing "it" and broke when it moved to a
+   section of its own.
 
 ## Voice levels
 
@@ -246,3 +258,33 @@ fix, pick one word, does not apply when both nouns are needed. The same test
 applies to a heading: "What it does" is fine only when the document's title
 names its one subject. Renaming a heading moves its anchor, so fix the links
 in the same change.
+
+### 8. Structure
+
+These rules apply to prose documents. A SKILL.md, AGENTS.md, or CLAUDE.md
+takes its structure from whatever the project uses to write agent instruction
+files, and this section does not apply to it. A project override can add rules
+for those files.
+
+**8.1 One topic per section.** The test is whether one heading can honestly
+name everything under it. If it cannot, the section is two. Split, and give
+each its heading. Two diagrams under one heading, each illustrating a different
+rule, is the clear case.
+
+**8.2 A heading names its content.** "Notes", "Important", "Misc", and "Things
+worth knowing before reviewing" assert worth or name nothing. Rename the
+heading for what is under it.
+
+**8.3 A section opens with the sentence its list supports.** A heading followed
+directly by bullets reads as notes to self. Open with the claim the bullets
+support. Two exceptions: a list whose heading is its introduction, such as
+"Requirements" over a list of requirements, and a surface that is a list by
+construction, such as a CHANGELOG entry.
+
+**8.4 Content lives in one place within a document.** The same point in two
+sections becomes the fuller copy and a pointer to it from the other. A summary
+in one document of a procedure another document owns is not this defect.
+
+**8.5 A list's introduction covers every item.** An item the introduction does
+not describe is in the wrong list or needs its own introduction. Requirements
+are not costs.
