@@ -9,7 +9,6 @@
       "changelog-path": "CHANGELOG.md",
       "include-component-in-tag": true,
       "bump-minor-pre-major": true,
-      "bump-patch-for-minor-pre-major": true,
       "draft": false,
       "prerelease": false,
       "pull-request-title-pattern": "chore(marketplace): release v${version}",
