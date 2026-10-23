@@ -87,7 +87,11 @@ gh pr create --fill
 Commit messages are conventional commits, checked by the commit-msg hook and
 again in CI. The type is not decoration. `feat` is a minor bump, `fix` is a
 patch, and either a `!` after the type or a `BREAKING CHANGE:` footer is a
-major. Scope the commit to the plugin, skill, or command it touches.
+major. Below 1.0 each bump is one step smaller — a break is a minor and a
+feature a patch — because every release-please config sets
+`bump-minor-pre-major` and `bump-patch-for-minor-pre-major`. The testing
+plugin's 0.2.0 and 0.2.1 show both. Scope the commit to the plugin, skill, or
+command it touches.
 
 One commit, one plugin. release-please attributes a commit to a plugin by the
 paths it touches, not by its scope, and it honors a breaking marker on every
