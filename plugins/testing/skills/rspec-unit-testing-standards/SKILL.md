@@ -121,7 +121,9 @@ Extract only setup that is identical and used by three or more files. No
 `shared_context` within a single file; the `let` hierarchy does that. Do not
 extract a helper because two files have similar-looking methods; if they build
 different doubles or defaults, the similarity is incidental. A unit spec that needs a
-`shared_context` to run is almost always an integration spec. Guide:
+`shared_context` to run is almost always an integration spec. What a shared context
+may hold, and that it never sets the subject, is the shared standards' rule on shared
+contexts. Guide:
 [General Fixture](../../docs/testing-guide.md#test-smells) and
 [Mystery Guest](../../docs/testing-guide.md#test-smells).
 

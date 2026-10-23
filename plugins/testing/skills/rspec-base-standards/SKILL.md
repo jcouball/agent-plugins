@@ -77,16 +77,17 @@ In order, for every spec written or reviewed, whatever its scope:
 5. Where the subject is Ruby code, a named `subject` first, the `let` inputs after
    it, a `context` overriding only the input its condition is about (Rules 10 to 13).
 6. `change` and `raise_error` matchers over before-and-after assertions; `let` for
-   every value and `before` only for side effects (Rules 14, 15).
+   every value and `before` only for side effects; a shared context holds setup and
+   never the subject (Rules 14 to 16).
 7. `allow` unless the message is the behavior under test, then `expect`; verifying
-   doubles, with a disable directive on each permitted exception (Rules 16, 17).
+   doubles, with a disable directive on each permitted exception (Rules 17, 18).
 8. Error assertions name the class and a message pattern; edge cases sit beside the
    normal case; every assertion names an outcome a specific code change would break
-   (Rules 18 to 20).
+   (Rules 19 to 21).
 9. Every example passes alone and in random order; no committed focus, skip, or
    `pending` marker; no `allow_any_instance_of`, `receive_message_chain`, or stub on the
    subject; no conditional logic inside an example; and no constant declared in a spec
-   file (Rules 21 to 25).
+   file (Rules 22 to 26).
 
 Then run the checklist of the standards for this spec's scope, which adds what that
 scope requires and says which of these rules it overrides.
@@ -267,9 +268,23 @@ is the hidden fixture its guide entry names. `before` holds only work that produ
 no value worth naming, and sets no instance variable. Guide:
 [`let!` as a hidden fixture](../../docs/testing-guide.md#rspec-smells).
 
+### Rule 16 (MUST): A shared context holds setup, never the subject
+
+A shared context holds `let`, `let!`, `before`, `after`, and the `include` of helper
+modules, and its values come from `let` so an including spec can override one. It
+never sets `subject` or `described_instance`: the spec that includes it must still
+show what it is testing. It may build doubles only when its name says so, which is
+the guide's test for a legitimate Mystery Guest. The including group shows the
+inclusion, with `include_context 'name'` or a metadata key named for the context.
+Guide: [Mystery Guest](../../docs/testing-guide.md#test-smells).
+
+A context should live under `spec/support/`, in a file named for its context string,
+so a reader can find it from the name alone. The project override names the
+subdirectory.
+
 ## Doubles and stubbing
 
-### Rule 16 (MUST): `allow` to stub; `expect` only when the message is the behavior
+### Rule 17 (MUST): `allow` to stub; `expect` only when the message is the behavior
 
 ```ruby
 # The return value is the behavior
@@ -285,7 +300,7 @@ When arguments need destructuring, pass a block to `receive` and assert inside i
 Guide: [Verification](../../docs/testing-guide.md#verification) and
 [Communication-based](../../docs/testing-guide.md#communication-based).
 
-### Rule 17 (MUST): Use verifying doubles
+### Rule 18 (MUST): Use verifying doubles
 
 `instance_double` and `class_double`, not `double`. Pass the constant,
 `instance_double(Billing::Gateway)`, so the double always verifies and a missing class
@@ -308,7 +323,7 @@ RSpec](../../docs/testing-guide.md#doubles-in-rspec).
 
 ## Assertions
 
-### Rule 18 (MUST): Error assertions name the class and a message pattern
+### Rule 19 (MUST): Error assertions name the class and a message pattern
 
 ```ruby
 expect { invoice.pay }.to raise_error(Billing::DeclinedError, /card ending 4242/)
@@ -317,7 +332,7 @@ expect { invoice.pay }.to raise_error(Billing::DeclinedError, /card ending 4242/
 The block form does not replace the message check; use both. Guide:
 [Error assertions without a message pattern](../../docs/testing-guide.md#test-anti-patterns).
 
-### Rule 19 (MUST): Edge cases sit beside the normal case for their condition
+### Rule 20 (MUST): Edge cases sit beside the normal case for their condition
 
 `nil`, empty, and boundary values are examples of the condition they are edges of,
 not a group at the end of the file. One example per equivalence class, not per
@@ -325,7 +340,7 @@ value: when a method treats every string the same way, one string proves it, and
 second string proves nothing. Guide:
 [Example-based](../../docs/testing-guide.md#example-based-default).
 
-### Rule 20 (MUST): Assert observable behavior a specific code change would break
+### Rule 21 (MUST): Assert observable behavior a specific code change would break
 
 A return value, a raised error, a state change, or a message to a collaborator. Before
 approving an assertion ask what change would fail only this example; if every other
@@ -340,7 +355,7 @@ Guide:
 
 ## Reliability
 
-### Rule 21 (MUST): Every example passes alone and in random order
+### Rule 22 (MUST): Every example passes alone and in random order
 
 The project sets `config.order = :random`; RSpec's own default is declaration order,
 which never exercises this rule. Where it is set, every run checks the order half. The
@@ -348,7 +363,7 @@ alone half needs each example run on its own, which the scope standards' verific
 does for each new or changed example. Guide:
 [Order dependence](../../docs/testing-guide.md#test-anti-patterns).
 
-### Rule 22 (MUST): No committed focus, skip, or `pending` markers
+### Rule 23 (MUST): No committed focus, skip, or `pending` markers
 
 Focus markers are an `f`-prefixed group or example, such as `fit`, `fdescribe`, or
 `fcontext`, and `:focus` metadata. Skip markers are an `x`-prefixed one, such as `xit`,
@@ -362,21 +377,21 @@ condition, such as a dependency older than the feature under test, is not one of
 it names why it skipped and it runs everywhere the condition holds. Guide: [Committed
 skip or focus markers](../../docs/testing-guide.md#test-anti-patterns).
 
-### Rule 23 (MUST): No `allow_any_instance_of`, `receive_message_chain`, or stub on the subject
+### Rule 24 (MUST): No `allow_any_instance_of`, `receive_message_chain`, or stub on the subject
 
 The first two hide the object boundary, and `allow(subject).to receive` replaces part
 of the thing under test. Allowed only when there is no seam and refactoring is out of
 scope, with an inline comment and a follow-up to add the seam. Guide:
 [Stubbing the subject](../../docs/testing-guide.md#rspec-anti-patterns).
 
-### Rule 24 (MUST): No conditional logic inside an example
+### Rule 25 (MUST): No conditional logic inside an example
 
 An `if`, a loop, or a `rescue` inside an example makes it test different things on
 different runs, and the example can itself be wrong. Each branch of the conditional is
 its own example, and an expected error is a `raise_error` matcher. Guide: [Conditional
 logic in a test](../../docs/testing-guide.md#test-anti-patterns).
 
-### Rule 25 (MUST): No class, module, or constant declared in a spec file
+### Rule 26 (MUST): No class, module, or constant declared in a spec file
 
 A class or constant declared in a spec file, at the top level or inside a group,
 persists into every later example in the process. Build a test class with `Class.new`
@@ -389,14 +404,14 @@ Where a project runs rubocop-rspec, these rules are enforced mechanically and ne
 reading to check: Rule 1 in part (RSpec/DescribeClass for the constant,
 RSpec/MultipleDescribes for one top-level group per file), 4 in part
 (RSpec/SpecFilePathFormat, for a constant subject outside `spec/routing`), 7
-(RSpec/ContextWording), 17 (RSpec/VerifiedDoubles, with the end-of-line directive Rule
-17 puts on each permitted exception the cop flags), 18 in part
-(RSpec/UnspecifiedException), 22 (RSpec/Focus for the focus markers, and RSpec/Pending
+(RSpec/ContextWording), 18 (RSpec/VerifiedDoubles, with the end-of-line directive Rule
+18 puts on each permitted exception the cop flags), 19 in part
+(RSpec/UnspecifiedException), 23 (RSpec/Focus for the focus markers, and RSpec/Pending
 for the skip and `pending` markers once a project enables it, since it is off by
-default), 23 (RSpec/AnyInstance, RSpec/MessageChain, RSpec/SubjectStub), and 25 in part
+default), 24 (RSpec/AnyInstance, RSpec/MessageChain, RSpec/SubjectStub), and 26 in part
 (RSpec/LeakyConstantDeclaration, for a declaration inside an example group). Rules 3 and
 6 name their own cop in their bodies, and random ordering checks the order half of Rule
-21.
+22.
 
 RSpec/DescribeClass does not ask for a constant where Rule 1 asks for a string: its
 defaults exempt any spec whose `type` metadata names a Rails spec type, and any file
@@ -422,9 +437,9 @@ RSpec/InstanceVariable catches instance variables and nothing else in Rule 15: a
 `before` that assigns values it should have left to `let` passes. RSpec/ExpectChange
 settles the argument style of `change`, not whether a before-and-after assertion should
 have been one (Rule 14). RSpec/MessageSpies is on by default in its `have_received`
-style, where it flags the `expect(...).to receive` form Rule 16 shows; a project
+style, where it flags the `expect(...).to receive` form Rule 17 shows; a project
 adopting rubocop-rspec must set `EnforcedStyle: receive` or turn the cop off, or the two
 disagree from the first run. RSpec/StubbedMock flags
-`expect(...).to receive(...).and_return`, which is one half of Rule 16. Rules 2, 8, 9,
-10, 14, 15, 16, and 24 are still read, as is Rule 4 for a string subject or a routing
+`expect(...).to receive(...).and_return`, which is one half of Rule 17. Rules 2, 8, 9,
+10, 14, 15, 16, 17, and 25 are still read, as is Rule 4 for a string subject or a routing
 spec. The project override says which of these run in the project.
