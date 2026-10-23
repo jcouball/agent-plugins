@@ -234,3 +234,15 @@ written for effect is judged by 7.6 as well, and still fails this rule if the
 reader has to decode it. A label that names what follows, including the bold
 lead-in 3.4 allows, is not compression, and neither is a fragment the reader
 parses without effort.
+
+**7.8 Name the referent.** A pronoun or bare demonstrative is a defect when
+two nouns within reach can take it. Technical prose makes this easy, because
+its nouns are near-identical: worktree and working tree, inner and outer
+repository, container and directory. Repeat the noun. At Reference, a
+placeholder such as `<path>`, introduced once and reused, is also fine. A
+sentence holding two candidates often cannot carry a pronoun at all and has to
+split, which is 7.2. Near-identical pairs are also what 2.5 catches, but 2.5's
+fix, pick one word, does not apply when both nouns are needed. The same test
+applies to a heading: "What it does" is fine only when the document's title
+names its one subject. Renaming a heading moves its anchor, so fix the links
+in the same change.
