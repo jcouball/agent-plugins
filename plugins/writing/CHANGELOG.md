@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.0](https://github.com/jcouball/agent-plugins/compare/writing-v1.4.0...writing-v1.5.0) (2026-10-23)
+
+
+### Features
+
+* **unslop:** Add the referent rule ([5e527ca](https://github.com/jcouball/agent-plugins/commit/5e527ca842bb19adae4a0b64a1f612f3c4684666)), closes [#42](https://github.com/jcouball/agent-plugins/issues/42)
+* **unslop:** Add the structure rules and report findings before rewriting ([9f3791e](https://github.com/jcouball/agent-plugins/commit/9f3791ea09c3d27d8718fedffc39d0d468c2166c)), closes [#41](https://github.com/jcouball/agent-plugins/issues/41)
+
 ## [1.4.0](https://github.com/jcouball/agent-plugins/compare/writing-v1.3.0...writing-v1.4.0) (2026-10-11)
 
 
