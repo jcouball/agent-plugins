@@ -807,6 +807,12 @@ per-type sections above do not repeat them.
   reader trusts when the example is collapsed or listed in a failure report.
 - **Error assertions without a message pattern.** Checking the class alone lets a
   different failure with the same class pass. Match the class and a message pattern.
+  One case, in an integration spec against a real dependency, where the pattern is
+  the wrong check: the library composes the message from the call it made rather than
+  from the failure, so the input is in it whatever went wrong. Then the pattern
+  matches every failure, and the check moves to what the failure produced, the exit
+  status and the tool's own error output. A unit spec of that library keeps the
+  pattern: there the message is the behavior under test.
 - **Committed skip or focus markers.** An unconditional skip, an `x`-prefixed example,
   or an example with no body is a test that silently stopped running. A committed
   `pending` still runs, and fails once the code starts working, but it keeps a known
