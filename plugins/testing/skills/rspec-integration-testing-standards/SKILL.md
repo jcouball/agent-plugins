@@ -184,16 +184,17 @@ stub is most likely to get wrong. Guide:
 Assert the values the test put in, exactly: the records it created, the file it wrote,
 the message it committed. Use `have_attributes`, `include` with a specific element, or
 `contain_exactly` on those fields, not `eq` on the whole record, which also asserts on
-fields the dependency chose and so tests the dependency. A class check,
-`not_to be_empty`, a count, or `respond_to` proves only that the dependency returned
-something. One example per spec file may make that its claim: the smoke test, whose
-only assertion is that the call succeeds against the real dependency and returns the
-expected class. No other example relies on the smoke test's checks, and no other
-example uses them in place of a value. An identifier the dependency generates has no
-value the test knows: match its shape with a pattern, then use it, by handing it back
-to the dependency and asserting on what comes back, as a SHA that matches `/\h{40}/`
-and then names a commit whose message is the one the test wrote. Text the dependency
-composes is Rule 6's concern. Guide:
+fields the dependency chose and so tests the dependency. A parser spec asserts those
+fields on purpose; it is Rule 6's exception. A class check, `not_to be_empty`, a
+count, or `respond_to` proves only that the dependency returned something. One
+example per spec file may make that its claim: the smoke test, whose only assertion
+is that the call succeeds against the real dependency and returns the expected class.
+No other example relies on the smoke test's checks, and no other example uses them in
+place of a value. An identifier the dependency generates has no value the test knows:
+match its shape with a pattern, then use it, by handing it back to the dependency and
+asserting on what comes back, as a SHA that matches `/\h{40}/` and then names a
+commit whose message is the one the test wrote. Text the dependency composes is
+Rule 6's concern. Guide:
 [Integration tests](../../docs/testing-guide.md#integration-tests), what it proves.
 
 ### Rule 6 (MUST): Do not assert on the dependency's formatting
@@ -233,6 +234,15 @@ expect { command.call('nonexistent-ref') }
     expect(error.stderr).to include('nonexistent-ref')
   }
 ```
+
+A spec whose subject parses the dependency's output asserts the parsed result exactly,
+including field values the dependency chose. That does not test the dependency. A unit
+spec with a fixture string covers the parser's branches; this spec confirms that the
+fixture is what the dependency really emits, which is Rule 3's contract test, so it
+has one example per output variant the dependency produces, not one per parsing
+branch. It produces the raw output with the arguments the code passes when it requests
+that output, so it parses the format the code really asks for. An output variant that
+differs across the project's supported versions gets a Rule 12 guard.
 
 Guide: [Testing
 the framework or a library](../../docs/testing-guide.md#test-anti-patterns),
