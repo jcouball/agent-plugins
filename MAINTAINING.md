@@ -16,6 +16,7 @@ plugins/<plugin>/
   .claude-plugin/plugin.json        the plugin manifest, declares its skills
   skills/<skill>/SKILL.md           one directory per skill
   commands/<command>.md             one file per slash command
+  docs/<name>.md                    reference the plugin's skills cite and ship
 scripts/                            the checks, their tests, the local install
                                     helper, and probe-github-rendering.mjs
   lib/                              the checks' code, which the tests import
@@ -87,11 +88,19 @@ gh pr create --fill
 Commit messages are conventional commits, checked by the commit-msg hook and
 again in CI. The type is not decoration. `feat` is a minor bump, `fix` is a
 patch, and either a `!` after the type or a `BREAKING CHANGE:` footer is a
-major. Below 1.0 each bump is one step smaller — a break is a minor and a
-feature a patch — because every release-please config sets
-`bump-minor-pre-major` and `bump-patch-for-minor-pre-major`. The testing
-plugin's 0.2.0 and 0.2.1 show both. Scope the commit to the plugin, skill, or
-command it touches.
+major. Scope the commit to the plugin, skill, or command it touches.
+
+Below 1.0.0 a break is a minor too, because every release-please config sets
+`bump-minor-pre-major`, so a plugin can break on every release while it finds
+its shape and no commit type takes it to 1.0.0. It gets there when you decide
+it should: put a `Release-As: 1.0.0` footer on a commit that touches the
+plugin's directory, since on a commit that touches other files release-please
+never sees it. Never put the footer, or a `!`, on an empty commit: release-please
+applies a commit with no files to every plugin, so one `git commit
+--allow-empty` would graduate or break all of them at once. The same footer
+pins any one release to any version. Until 2026-10 the configs also set
+`bump-patch-for-minor-pre-major`, which made a feature a patch below 1.0.0;
+the testing plugin's 0.2.1 shows it.
 
 One commit, one plugin. release-please attributes a commit to a plugin by the
 paths it touches, not by its scope, and it honors a breaking marker on every
@@ -99,7 +108,11 @@ plugin the commit reaches. A `feat(github)!` that also updates references in
 the marketplace commands therefore proposes a major bump for the marketplace
 plugin too — which is how marketplace v2.0.0 shipped a changelog describing a
 github rename. When a change spans plugin directories, split it into one
-commit per plugin so the type and the `!` land only where they apply.
+commit per plugin so the type and the `!` land only where they apply. A
+commit that touches files, none of them under `plugins/`, belongs to no
+plugin, whatever its scope says, and reaches no changelog and no release. A
+commit that touches no files at all is the opposite case: it belongs to every
+plugin.
 
 ### Labeling an issue
 
@@ -270,7 +283,8 @@ an error.
 
 1. Create `plugins/<name>/.claude-plugin/plugin.json`.
 2. Add an entry to the `plugins` array in the marketplace manifest with
-   `"source": "./plugins/<name>"`.
+   `"source": "./plugins/<name>"` and a `description` identical to the one in
+   `plugin.json`; the manifest check compares them.
 3. Create `.release-please/<name>-config.json` and seed its starting version
    in `.release-please/<name>-manifest.json`. Copy an existing pair and
    change the plugin name throughout. The manifest check fails while either
