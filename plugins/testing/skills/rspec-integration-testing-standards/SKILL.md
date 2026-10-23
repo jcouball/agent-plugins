@@ -193,9 +193,33 @@ varies by version of the external tool belongs to that tool's tests. If a flag h
 shown to reach the tool, a unit spec asserts on the arguments. An error assertion still
 names the class and a message pattern, as the shared standards require: anchor the
 pattern on something the example controls, such as the input value or the subcommand
-name, and never drop the pattern because the tool's wording may change. Guide: [Testing
-the framework or a library](../../docs/testing-guide.md#test-anti-patterns) and
-[Sensitive Equality](../../docs/testing-guide.md#test-smells).
+name, and never drop the pattern because the tool's wording may change.
+
+That pattern is the right check when the message comes from the tool's output, as
+Rule 4's example does. It checks nothing when the library builds the message from the
+call itself, so that the input is in it whatever failed: then it matches a failure the
+tool reports before it reads the input, such as an unknown option, as readily as the
+one the example forces. In that case use the block form and assert on what the
+failure produced, which the exception carries. First the exit status, a shape Rule 3
+already recognizes, which separates a usage error from a failure of the operation.
+Then the input in the dependency's own error output, anchored on the input as above.
+Do not assert on the wording that tells two failures apart; that is the tool's. When
+the exception carries neither a status nor the output, the message pattern on the
+input is still the best check available and stays.
+
+```ruby
+# The message is "git rev-parse nonexistent-ref: ..." for every failure of the call
+expect { command.call('nonexistent-ref') }
+  .to raise_error(Runner::Failed) { |error|
+    expect(error.status).to eq(128)                   # 129 would be a usage error
+    expect(error.stderr).to include('nonexistent-ref')
+  }
+```
+
+Guide: [Testing
+the framework or a library](../../docs/testing-guide.md#test-anti-patterns),
+[Sensitive Equality](../../docs/testing-guide.md#test-smells), and [Error assertions
+without a message pattern](../../docs/testing-guide.md#test-anti-patterns).
 
 ### Rule 7 (MUST): Do not cover a conditional path a unit spec covers
 
