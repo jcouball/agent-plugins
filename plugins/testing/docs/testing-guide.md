@@ -294,10 +294,12 @@ describe a value the collaborator never produces while both suites stay green.
 
 **What it proves.** That the layers in the path agree with each other and with the
 real dependency at the end. What the layers hand each other is the shape of a result
-and the values the test put in, so those are what its assertions check. Anything the
-dependency decides for itself, such as its wording, is the dependency's to test. It
-does not prove each layer's conditional paths; that is unit test work, and duplicating
-it here makes the suite slow for no added confidence.
+and the values the test put in, so those are what its assertions check. Where the
+test knows a value, it asserts that value; a shape check alone proves only that the
+dependency returned something. Anything the dependency decides for itself, such as
+its wording, is the dependency's to test. It does not prove each layer's conditional
+paths; that is unit test work, and duplicating it here makes the suite slow for no
+added confidence.
 
 **Cost.** Slower than unit tests, faster than system tests. Setup that touches a
 subprocess or the filesystem is a frequent source of order dependence and flakiness.
