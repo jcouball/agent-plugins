@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.0.0](https://github.com/jcouball/agent-plugins/compare/testing-v0.2.1...testing-v1.0.0) (2026-10-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **testing:** a shared context that sets subject or described_instance is now a violation. Base Rules 16 to 25 are renumbered 17 to 26; the other skills cite base rules by subject and are unaffected.
+* **testing:** an integration spec that asserts a message pattern on an exception whose message embeds the command line is now a violation; it asserts on the exit status and the tool's error output instead.
+
+### Features
+
+* **testing:** Add a shared rule on what a shared context holds ([45e767a](https://github.com/jcouball/agent-plugins/commit/45e767a1af605f0812b7ace53f0712f37de4359f)), closes [#61](https://github.com/jcouball/agent-plugins/issues/61)
+* **testing:** Let a parser spec assert the parsed result exactly ([9d895d4](https://github.com/jcouball/agent-plugins/commit/9d895d4fd90a70e62fd5945363f2fa382c68b9e2)), closes [#56](https://github.com/jcouball/agent-plugins/issues/56)
+* **testing:** Say how a review treats violations in specs the change did not touch ([14d63df](https://github.com/jcouball/agent-plugins/commit/14d63df69dcd886e0ac5148cf30d75a7dba1ed30)), closes [#55](https://github.com/jcouball/agent-plugins/issues/55)
+* **testing:** Say when a class-family convention wins over a standards rule ([0466039](https://github.com/jcouball/agent-plugins/commit/0466039bf40f198c2544d08ccac7d8046bc98130)), closes [#53](https://github.com/jcouball/agent-plugins/issues/53)
+
+
+### Bug Fixes
+
+* **testing:** Check a wrapped failure by status and output when the message embeds the call ([04e4fb3](https://github.com/jcouball/agent-plugins/commit/04e4fb3b28bbb496146f118c572c2020af86d889)), closes [#54](https://github.com/jcouball/agent-plugins/issues/54)
+* **testing:** Let a backward-compatible alias spec assert that it is its target ([6923e00](https://github.com/jcouball/agent-plugins/commit/6923e0011157285b34f1083912ee742c193cda90)), closes [#59](https://github.com/jcouball/agent-plugins/issues/59)
+* **testing:** Say that an integration example never sleeps, and what it does instead ([bcdf585](https://github.com/jcouball/agent-plugins/commit/bcdf5854452a5048c750b9f5c4f8d4523a047985)), closes [#60](https://github.com/jcouball/agent-plugins/issues/60)
+
 ## [0.2.1](https://github.com/jcouball/agent-plugins/compare/testing-v0.2.0...testing-v0.2.1) (2026-10-13)
 
 
