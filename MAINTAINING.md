@@ -227,7 +227,11 @@ Six checks, each runnable on its own:
   a scheme GitHub strips, such as `tel:`, is reported. A fragment into a file
   that is not markdown is not checked, and neither is a bare `#fragment` link:
   markdownlint's MD051 checks those, so a broken one in a release-please
-  changelog, which markdownlint skips, goes unreported.
+  changelog, which markdownlint skips, goes unreported. Link-shaped text the
+  parser rejected is reported too, since GitHub shows it as literal brackets
+  and no other check sees a link in it. The usual cause is a destination
+  wrapped across a line break, so a long line breaks before the `[` of a
+  link, never inside one. Escape the `]` when the brackets are meant as text.
 - `npm run lint:actions` runs actionlint over `.github/workflows/`, which
   catches broken expressions, undefined contexts, bad `runs-on` labels, and
   wrong action inputs before a push finds them.
