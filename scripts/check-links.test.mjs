@@ -58,6 +58,56 @@ describe('checkLinks', () => {
     assert.deepEqual(run({ 'a.md': '[x](b.md#nope)', 'b.md': '# Heading' }).broken, ['a.md: b.md#nope (no such heading)'])
   })
 
+  test('reports link-shaped text the parser rejected, without counting it', () => {
+    const files = {
+      'a.md': 'See [the guide](docs/guide.md\n#usage) for details.',
+      'b.md': '[plain](a b) and [open](a',
+      'c.md': '[**bold** text]\n(url.md)',
+      'd.md': '[literal backslash\\\\](a\nb)',
+    }
+    assert.deepEqual(run(files), {
+      broken: [
+        'a.md: [the guide](docs/guide.md #usage) (not a link; escape the ] if it is meant as text)',
+        'b.md: [plain](a b) (not a link; escape the ] if it is meant as text)',
+        'b.md: [open](a (not a link; escape the ] if it is meant as text)',
+        'c.md: text] (url.md) (not a link; escape the ] if it is meant as text)',
+        'd.md: [literal backslash\\\\](a b) (not a link; escape the ] if it is meant as text)',
+      ],
+      checked: 0,
+    })
+  })
+
+  test('does not report the shape in a code span, in an autolink, or with the bracket escaped', () => {
+    const files = {
+      'a.md': 'Write `[x](a\nb)` or [x\\](a\nb) and [ok](<a b> "t") [t](a (t)) <https://example.com/a](b> [label]\\!(value)',
+      'a': '',
+      'a b': '',
+    }
+    assert.deepEqual(run(files), { broken: [], checked: 2 })
+  })
+
+  test('does not report the shape inside a fenced code block', () => {
+    assert.deepEqual(run({ 'a.md': '```\n[x](a\nb)\n```' }), { broken: [], checked: 0 })
+  })
+
+  test('reports a split destination inside a block quote, but not a label and paren split by a quote marker', () => {
+    const files = { 'a.md': '> See [the guide](docs/guide.md\n> #usage) here.\n\n> [guide]\n> (url.md)' }
+    assert.deepEqual(run(files), {
+      broken: ['a.md: [the guide](docs/guide.md > #usage) (not a link; escape the ] if it is meant as text)'],
+      checked: 0,
+    })
+  })
+
+  test('checks an image inside the label of a link or reference', () => {
+    const files = { 'a.md': '[![alt](missing.png)](b.md) [![alt](gone.png)][r]\n\n[r]: b.md', 'b.md': '' }
+    assert.deepEqual(run(files), { broken: ['a.md: missing.png', 'a.md: gone.png'], checked: 4 })
+  })
+
+  test('does not report the shape inside the label of an accepted link or reference', () => {
+    const files = { 'a.md': '[label **[x](a b)**](b.md) [label [x](a b)][r]\n\n[r]: b.md#nope', 'b.md': '# B' }
+    assert.deepEqual(run(files), { broken: ['a.md: b.md#nope (no such heading)'], checked: 2 })
+  })
+
   test('checks the target of a reference definition', () => {
     assert.deepEqual(run({ 'a.md': '[x][r]\n\n[r]: b.md#nope', 'b.md': '# Heading' }).broken, ['a.md: b.md#nope (no such heading)'])
   })

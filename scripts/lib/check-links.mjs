@@ -17,6 +17,11 @@
 // each h1-h6 in that tree, markdown or raw HTML, is slugged in document order
 // by github-slugger, which follows GitHub's rules. Links are read from an mdast
 // syntax tree of the same markdown, so nothing inside code is taken for one.
+//
+// Text the parser refused to take for a link is reported too. A destination
+// split across a line break, a space in a bare destination, or an unbalanced
+// paren leaves the whole thing as literal text, which GitHub renders with the
+// brackets showing and no checker sees a link in.
 
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { join, dirname, resolve, relative as relativePath, isAbsolute, sep } from 'node:path'
@@ -28,7 +33,7 @@ import { micromark } from 'micromark'
 import { frontmatter, frontmatterHtml } from 'micromark-extension-frontmatter'
 import { gfm, gfmHtml } from 'micromark-extension-gfm'
 import { parse as parseHtml } from 'parse5'
-import { visit } from 'unist-util-visit'
+import { SKIP, visit } from 'unist-util-visit'
 
 const skip = new Set(['node_modules', '.git'])
 // Claude Code puts git worktrees here; their markdown belongs to another branch.
@@ -152,9 +157,43 @@ export const keptSchemes = new Set(['http', 'https', 'mailto', 'xmpp', 'github-w
 // so a link may name either.
 export const userContent = 'user-content-'
 
+// A link the parser accepts consumes its `](` as delimiters, so the pair never
+// reaches a text node. One it rejects falls back to literal text with the pair
+// still in it. The source is matched rather than the node's value, because the
+// value has backslash escapes removed, and `\]` is how a deliberate one is
+// written. The whitespace allows `[text]` with `(url)` on the next line.
+//
+// Inside a block quote, that one shape is missed when the next line carries
+// its own `>` marker, because the marker sits between the `]` and the `(` in
+// the source. A destination split across the line break is still caught there,
+// since its `](` stays adjacent. Reading past the marker would mean knowing
+// container syntax here, which is the parser's job, for the rarest shape in a
+// construct this repository does not use.
+const unparsedLink = /\]\s*\(/g
+
+// A backslash escapes the ASCII punctuation after it, itself included. Masking
+// each pair at its own length, left to right, takes `\\` as one escape, so the
+// `]` after it stays active while the `]` in `\]` does not, and every index
+// still points into the source. The mask is not whitespace, or `]\!(` would
+// become `]  (` and match.
+const escapes = /\\[!-/:-@[-`{-~]/g
+const withoutEscapes = (text) => text.replace(escapes, '__')
+
+// The link-shaped text around a match: from the `[` before it, or the start of
+// the node, through the `)` after it, or the end, on one line.
+const shapeAround = (text, index) => {
+  const open = text.lastIndexOf('[', index)
+  const close = text.indexOf(')', index)
+  return text
+    .slice(open === -1 ? 0 : open, close === -1 ? text.length : close + 1)
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 // Every broken relative link in the markdown under root, and how many relative
 // links were checked. Links, images, and reference definitions are read from
-// the syntax tree, so nothing inside code is taken for a link.
+// the syntax tree, so nothing inside code is taken for a link. Link-shaped text
+// the parser rejected is reported and not counted, since no link was checked.
 export function checkLinks(root) {
   const broken = []
   let checked = 0
@@ -172,7 +211,10 @@ export function checkLinks(root) {
   }
 
   for (const file of markdownFiles(root)) {
-    visit(parse(sourceOf(file)), ['link', 'image', 'definition'], (node) => {
+    const source = sourceOf(file)
+
+    // One link, image, or definition node: resolve its target and report it.
+    const checkTarget = (node) => {
       const target = node.url
 
       if (target === '') return
@@ -228,6 +270,29 @@ export function checkLinks(root) {
       if (!known.has(fragment) && !(unprefixed && unprefixed !== 'top' && known.has(unprefixed))) {
         report('no such heading')
       }
+    }
+
+    // Nothing under a link the parser accepted is a rejected link, however
+    // the label is marked up: an autolink's URL may hold the pair, and so may
+    // a label. So a link's own target is checked and its subtree is skipped,
+    // and a reference's subtree too; its definition is checked on its own.
+    // The images in a label have targets of their own, so they are checked
+    // before the skip; nothing else under a link does.
+    const skipLabel = (node) => {
+      visit(node, 'image', checkTarget)
+      return SKIP
+    }
+    visit(parse(source), ['link', 'image', 'definition', 'linkReference', 'text'], (node) => {
+      if (node.type === 'linkReference') return skipLabel(node)
+      if (node.type === 'text') {
+        const text = source.slice(node.position.start.offset, node.position.end.offset)
+        for (const match of withoutEscapes(text).matchAll(unparsedLink)) {
+          broken.push(`${relativePath(root, file)}: ${shapeAround(text, match.index)} (not a link; escape the ] if it is meant as text)`)
+        }
+        return
+      }
+      checkTarget(node)
+      if (node.type === 'link') return skipLabel(node)
     })
   }
   return { broken, checked }
