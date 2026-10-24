@@ -58,6 +58,30 @@ describe('checkLinks', () => {
     assert.deepEqual(run({ 'a.md': '[x](b.md#nope)', 'b.md': '# Heading' }).broken, ['a.md: b.md#nope (no such heading)'])
   })
 
+  test('reports link-shaped text the parser rejected, without counting it', () => {
+    const files = {
+      'a.md': 'See [the guide](docs/guide.md\n#usage) for details.',
+      'b.md': '[plain](a b) and [open](a',
+      'c.md': '[**bold** text]\n(url.md)',
+    }
+    assert.deepEqual(run(files), {
+      broken: [
+        'a.md: [the guide](docs/guide.md #usage) (not a link; escape the ] if it is meant as text)',
+        'b.md: [plain](a b) (not a link; escape the ] if it is meant as text)',
+        'b.md: [open](a (not a link; escape the ] if it is meant as text)',
+        'c.md: text] (url.md) (not a link; escape the ] if it is meant as text)',
+      ],
+      checked: 0,
+    })
+  })
+
+  test('does not report the shape in a code span, or with the bracket escaped', () => {
+    assert.deepEqual(run({ 'a.md': 'Write `[x](a\nb)` or [x\\](a\nb) and [ok](<a b> "t") [t](a (t))', 'a': '', 'a b': '' }), {
+      broken: [],
+      checked: 2,
+    })
+  })
+
   test('checks the target of a reference definition', () => {
     assert.deepEqual(run({ 'a.md': '[x][r]\n\n[r]: b.md#nope', 'b.md': '# Heading' }).broken, ['a.md: b.md#nope (no such heading)'])
   })
