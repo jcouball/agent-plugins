@@ -12,7 +12,7 @@ Derived from the "unslop" skill in poteto's pstack plugin. MIT licensed.
 
     repo:   https://github.com/cursor/plugins
     path:   pstack/skills/unslop/SKILL.md
-    commit: 70b2dc8b4b85c8d5648624ca40d692c421fff32f
+    commit: bc697d0a5a163cec979e362b601e36f5616083fd
 
 ## License
 

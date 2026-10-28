@@ -112,14 +112,14 @@ showcase, tapestry (abstract), testament, underscore, vibrant. Replace with
 plain words.
 
 **2.2 Fancy ways to say "is".** "serves as", "stands as", "boasts",
-"features". Just say "is" or "has".
+"features". Say "is" or "has".
 
 **2.3 "Not just X, but Y."** Also its variants: "not only X but also Y", "It's
 not about X; it's about Y", "more than just X". State the point directly
 instead.
 
-**2.4 Rule of three.** Forcing ideas into groups of three. Use the natural
-number.
+**2.4 Rule of three.** Don't force ideas into groups of three. Use the
+natural number.
 
 **2.5 Synonym cycling.** Protagonist, main character, central figure, hero all
 in one paragraph. Pick one, repeat it.
@@ -133,12 +133,12 @@ scale. List topics directly.
 (no parentheses, no en dashes, no hyphen-as-dash substitutes). If a thought
 needs separation, end the sentence or use a comma.
 
-**3.2 Colon overuse.** Colons are fine before a list or example. Not as
+**3.2 Colon overuse.** Colons are fine before a list or example, not as
 mid-sentence connectors. "If you're coming from traditional automation:
 instead of registering event handlers, you describe conditions" adds nothing
 with the colon. Rewrite so the point needs no comparison framing.
 "Describing when the scheduler should fire works best as plain English." Same
-meaning, without the colon.
+meaning, no crutch punctuation.
 
 **3.3 Boldface overuse.** Don't bold every proper noun or acronym. Unbold
 everything except the few terms a reader skimming the page must find.
@@ -154,7 +154,7 @@ fine, not a tell.
 **3.6 Decorative emojis.** Remove from headings, bullets, and body text. An
 emoji stays only where it carries meaning the words do not.
 
-**3.7 Curly quotes.** Replace with straight quotes.
+**3.7 Curly quotes.** Use straight quotes.
 
 ### 4. Communication artifacts
 
@@ -171,7 +171,7 @@ was dead code") is not sycophancy and stays.
 ### 5. Filler
 
 **5.1 Filler phrases.** "In order to" becomes "To". "Due to the fact that"
-becomes "Because". "It is important to note that" gets deleted.
+becomes "Because". Delete "It is important to note that".
 
 **5.2 Excessive hedging.** "could potentially possibly be argued that it
 might" becomes "may". One hedge is enough when uncertainty is real; none when
@@ -216,12 +216,12 @@ file". Passive is fine only when the actor is unknown or genuinely doesn't
 matter.
 
 **7.4 Cut adverbs, or use a stronger verb.** "runs quickly" becomes "is fast"
-or the number. "significantly improves" becomes the measured delta. An adverb
-that compensates for a weak verb means the verb is wrong.
+or the number, and "significantly improves" becomes the measured delta. An
+adverb that compensates for a weak verb means the verb is wrong.
 
-**7.5 Prefer the plain word.** "utilize" becomes "use", "leverage" becomes
-"use", "facilitate" becomes "help", "numerous" becomes "many", "in the event
-that" becomes "if". The fancier synonym is rarely clearer.
+**7.5 Prefer the plain word.** "utilize" and "leverage" become "use",
+"facilitate" becomes "help", "numerous" becomes "many", "in the event that"
+becomes "if". The fancier synonym is rarely clearer.
 
 **7.6 Mannered prose.** Metaphor or flourish where a literal phrase exists:
 aphorisms ("wire it or delete it"), personified code ("the plan holds it"),
