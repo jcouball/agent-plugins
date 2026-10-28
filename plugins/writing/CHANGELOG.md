@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.5.1](https://github.com/jcouball/agent-plugins/compare/writing-v1.5.0...writing-v1.5.1) (2026-10-28)
+
+
+### Bug Fixes
+
+* **unslop:** Port the upstream wording fixes ([079154e](https://github.com/jcouball/agent-plugins/commit/079154eff6794b6ff5326c2634f02a754f3b42cd))
+* **unslop:** Rewrite verbless fragments in local commentary ([c031344](https://github.com/jcouball/agent-plugins/commit/c0313443715c5871d2f9e78ea7c1f032bf8f74f1))
+
 ## [1.5.0](https://github.com/jcouball/agent-plugins/compare/writing-v1.4.0...writing-v1.5.0) (2026-10-24)
 
 
