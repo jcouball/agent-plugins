@@ -27,9 +27,9 @@ Edit text to remove AI patterns and add human voice.
    the list is the deliverable; stop and wait for their decision. When the
    user asked for an edit, or another skill or command invoked this one,
    continue to the next step without pausing.
-4. Rewrite. Preserve meaning, match intended tone. Be specific. Not "this is
-   concerning" but "the job runs unattended at 3am and nothing checks its
-   exit code". Vague writing reads as generated at every voice level,
+4. Rewrite. Preserve meaning, match intended tone. Be specific. Write "the
+   job runs unattended at 3am and nothing checks its exit code", not "this
+   is concerning". Vague writing reads as generated at every voice level,
    including reference.
 5. Apply the voice level.
 6. Self-audit with two questions. "What makes this obviously AI generated?"
@@ -81,7 +81,7 @@ Restrained voice. The reader needs to understand a decision, not meet the author
 
 Full voice. The reader is a person who may reply.
 
-- Everything in Explanatory, plus the following.
+- Everything in Explanatory applies, plus the following.
 - Use "I" when it fits. First person is not unprofessional.
 - Let some mess in. Perfect structure looks machine made. Mess means rhythm
   and asides, which 7.6 judges at this level, not dropped articles or
@@ -114,8 +114,8 @@ plain words.
 **2.2 Fancy ways to say "is".** "serves as", "stands as", "boasts",
 "features". Say "is" or "has".
 
-**2.3 "Not just X, but Y."** Also its variants: "not only X but also Y", "It's
-not about X; it's about Y", "more than just X". State the point directly
+**2.3 "Not just X, but Y."** Its variants are "not only X but also Y", "It's
+not about X; it's about Y", and "more than just X". State the point directly
 instead.
 
 **2.4 Rule of three.** Don't force ideas into groups of three. Use the
@@ -159,9 +159,9 @@ emoji stays only where it carries meaning the words do not.
 ### 4. Communication artifacts
 
 **4.1 Chatbot phrases.** "I hope this helps!", "Let me know if...", "Of
-course!", "Certainly!", "Found the smoking gun!" More generally: openers,
-closers, and canned enthusiasm addressed to the reader instead of the subject.
-Remove.
+course!", "Certainly!", "Found the smoking gun!" The general pattern is
+openers, closers, and canned enthusiasm addressed to the reader instead of the
+subject. Remove.
 
 **4.2 Sycophantic tone.** Praise or agreement used as an opener or filler:
 "Great question!", "You're absolutely right!", "Excellent point!". Delete the
