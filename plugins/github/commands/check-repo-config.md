@@ -506,9 +506,34 @@ before the first write:
   belongs to a user and a 409 has no documented cause: report the status
   and GitHub's message, if there is one, as found-but-not-fixable beside
   `https://$HOST/$OWNER/$REPO/settings/actions`, and do not explain it.
-  A field that still drifts on the post-apply re-read after a 204 is a
-  failed fix, not a cap: GitHub documents no such outcome, so report
-  what the re-read shows and do not explain it.
+
+  A read straight after a 204 can lag the write, as the end of this
+  step records, so after the writes re-read until every written field
+  matches, up to five reads a second apart:
+
+  ```bash
+  WANT=$(printf '%s\t%s' <expected default_workflow_permissions> \
+    <expected can_approve_pull_request_reviews>)
+  for attempt in 1 2 3 4 5; do
+    if ! LIVE=$(gh api "repos/$OWNER/$REPO/actions/permissions/workflow" \
+      --jq '[.default_workflow_permissions,
+             .can_approve_pull_request_reviews] | @tsv'); then
+      echo "re-read failed on attempt $attempt: $LIVE" >&2
+      break
+    fi
+    [ "$LIVE" = "$WANT" ] && break
+    sleep 1
+  done
+  ```
+
+  Each expected value is the baseline's for a field whose `PUT`
+  answered 204 and Step 1's live value for any other, so a capped field
+  is not waited on. When the read fails, `$LIVE` holds the error body
+  `gh api` prints: report both fields as blocked on reading the
+  endpoint, with that message, as Step 1 does, and not as drift. A
+  field that still differs after the fifth read is a failed fix, not a
+  cap: GitHub documents no such outcome, so report what the last read
+  shows and do not explain it.
 
 - Branch rules need a repository ruleset — one of those Step 1 fetched.
   Merge the baseline into an existing ruleset only when all of these hold:
@@ -697,7 +722,13 @@ administrator was here: rebuild the plan from the fresh state — the
 merge-method safety calculation included — and confirm again rather
 than silently overwriting their change. After applying, re-run the read
 commands and report the checklist again so the fix is verified, not
-assumed.
+assumed. A read straight after a successful write can lag it: the
+Actions `PUT` has returned the old value within a second of a 204 and
+the new one a read later. A line that still drifts right after a
+successful write is therefore re-read until it matches, up to five
+reads a second apart, and reported as a failed fix only after the
+fifth; a re-read that errors is reported as blocked on reading the
+endpoint, with the API's message, and not as drift.
 
 ## Step 4: Agent guidance
 
