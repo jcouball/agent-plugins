@@ -10,21 +10,32 @@ mean a report-only run, and anything else — `--fix=false`, a typo, an extra
 word — is an error that stops the command: a substring test would let
 `--fix=false` trigger repository writes.
 
-Needs the `gh` CLI authenticated (`gh auth status`), `jq` on `PATH` — `gh`
-does not imply the standalone `jq` its `--jq` flag resembles, and the
-percent-encoding in Step 1 shells out to the real one — and a SHA-256 tool
-for Step 4's ownership hashes: `shasum -a 256` or `sha256sum`, whichever
-the system has; both print the same digest.
+The deterministic work — reading the baseline and the live configuration,
+comparing them, planning and applying the writes, and rendering the guidance
+block — is done by a script that ships with this plugin, so the same inputs
+always produce the same checklist. This command's job is what the script
+cannot do: reporting, judging the prose of agent guidance, and getting the
+user's confirmation before anything outward-facing changes.
+
+Needs the `gh` CLI authenticated (`gh auth status`) at version 2.42 or
+later, `node` 22 or later, and `git`. The script is at
+`${CLAUDE_PLUGIN_ROOT}/scripts/check-repo-config.mjs`. When that variable
+is not set — this command was pasted rather than run from the installed
+plugin — clone `https://github.com/jcouball/agent-plugins` into a
+temporary directory and use `plugins/github/scripts/check-repo-config.mjs`
+from the clone. Every invocation below is written as:
+
+```bash
+SCRIPT="${CLAUDE_PLUGIN_ROOT}/scripts/check-repo-config.mjs"
+```
+
+Every subcommand prints one JSON document to stdout. A non-zero exit means
+the document is an error to report: 1 is a fatal error or bad usage, 2 is a
+baseline error, 3 is a stale plan, and 4 is a refused guidance write.
 
 ## The baseline
 
-Read `.claude/repo-guardrails.yml` at the repository root — after
-canonicalizing the path, as Step 4 does for instruction files. A
-tracked symlink there can resolve outside the repository, and opening
-it would read host-local data before any validation runs; a resolved
-path outside the repository is a baseline error, and so is one
-resolving to an untracked file inside it — untracked content is one
-machine's, not the repository's, and must not drive `--fix` writes. The
+The baseline is `.claude/repo-guardrails.yml` at the repository root. The
 file can define:
 
 ```yaml
@@ -51,684 +62,186 @@ Patterns follow GitHub ruleset syntax (Ruby `fnmatch` with pathname
 semantics): `*` stays within one path segment, and a terminal `**` does
 too — only `**/` crosses `/`. So `release/*` matches `release/1.0` but
 not `release/2026/1.0`, and `release/**` matches no more; write
-`release/**/*` to cover any depth. Resolve branch matches with those
-rules. In a ruleset condition a pattern appears as `refs/heads/<pattern>`:
-add that prefix, and copy the fnmatch portion after it verbatim — that
-part is already in the syntax rulesets read. Copying the bare pattern into
-a condition drops the prefix and targets nothing.
+`release/**/*` to cover any depth. `branch_rules` may name `pull_request`
+and the parameterless types `creation`, `deletion`, `non_fast_forward`,
+`required_linear_history`, and `required_signatures`. Requiring status
+checks to pass before merge is deliberately out of scope: check contexts
+vary per repository, so configure that gate by hand in the ruleset when
+wanted — the audit never removes or loosens rules the baseline does not
+mention, so a hand-added rule survives every `--fix`.
 
-`branch_rules` may name `pull_request` and the parameterless rule types:
-`creation`, `deletion`, `non_fast_forward`, `required_linear_history`,
-`required_signatures`. Other types — `required_status_checks` or
-`required_deployments`, say — take parameters this baseline does not
-model, so a bare rule object for them is rejected by the API; report an
-unsupported type as a baseline error. Requiring status checks to pass
-before merge is deliberately out of scope: check contexts vary per
-repository, so configure that gate by hand in the ruleset when wanted —
-the audit never removes or loosens rules the baseline does not mention,
-so a hand-added rule survives every `--fix`.
+Where the file is missing or a key is absent, the built-in defaults apply:
+`main` and `master`; rebase only; `delete_branch_on_merge: true` and
+`allow_auto_merge: false`; a `read` token that cannot approve pull
+requests; and the four rule types above.
 
-Where the file is missing or a key is absent, use these defaults:
+The script validates the resolved baseline before reading anything from
+GitHub, in a report-only run as much as under `--fix`, and exits 2 with a
+`baseline_errors` list when the file has an unknown or duplicate key, a
+value of the wrong shape, an empty or duplicated pattern, a pattern that is
+a selector token or carries a `refs/` prefix, an unsupported or duplicated
+rule type, no `pull_request` rule, no enabled merge method, or
+`required_linear_history` beside merge commits as the only method. It also
+exits 2 when the file is a symlink resolving outside the repository or to
+an untracked file. Report those errors verbatim and stop: a misread file is
+worse than a missing one, because the audit would otherwise report pass and
+drift confidently against the wrong baseline.
 
-- `protected_branches`: `main`, `master`
-- `merge_methods`: rebase only
-- `repository`: `delete_branch_on_merge: true`, `allow_auto_merge: false`
-- `actions`: `default_workflow_permissions: read`,
-  `can_approve_pull_request_reviews: false`
-- `branch_rules`: `pull_request`, `non_fast_forward`, `deletion`,
-  `required_linear_history`
-
-Validate the resolved baseline before comparing anything — in a
-report-only run as much as under `--fix`. A misread file is worse than a
-missing one: the audit would compare against defaults it was told to
-override and report pass and drift confidently against the wrong baseline.
-Stop with a baseline error, and report nothing else, when the guardrails
-file has:
-
-- a key the schema does not define, at the top level or within
-  `merge_methods`, `repository`, or `actions`. A misspelled key is
-  otherwise read as absent and silently replaced by its default, so
-  `allow_auto_merg: true` would have the audit check — and `--fix`
-  write — `allow_auto_merge: false`, the opposite of the evident intent.
-- a mapping key that appears twice, at any level. YAML loaders disagree
-  about duplicates — some reject them, others keep the first value or
-  the last — so a file with two `rebase:` keys has the audit enforce
-  whichever one the loader happened to keep, and `--fix` write a
-  setting that matches at most half of what the file appears to say.
-- a value of the wrong shape. The file's root, `merge_methods`,
-  `repository`, and `actions` must each be a mapping; the settings inside
-  `merge_methods` and `repository` take booleans, and so does
-  `can_approve_pull_request_reviews`; `default_workflow_permissions`
-  takes `read` or `write`, the only two values the API accepts;
-  `protected_branches` and `branch_rules` take lists of strings. A
-  scalar or list where a mapping belongs — a root that is a string, or
-  `repository: true` — is malformed, not "every key absent", and must
-  stop the run rather than quietly resolve to the defaults.
-- an explicitly empty `protected_branches` list, or an empty pattern in
-  it. An absent key is not an error: it resolves to its default like any
-  other.
-- a `protected_branches` pattern that is a selector token or already
-  carries a ref prefix — one starting with `~` or `refs/`. Patterns here
-  are bare fnmatch patterns that Step 3 prefixes with `refs/heads/`, so
-  `~ALL`, `~DEFAULT_BRANCH`, or `refs/heads/main` would become
-  ineffective literals — `refs/heads/~ALL` matches no branch — while the
-  audit compares against the same broken value and reports drift no fix
-  can clear.
-- a `protected_branches` pattern that appears twice. Duplicates produce
-  duplicate ruleset selectors and canonical guidance that reads
-  `` `main` or `main` `` — and if GitHub normalizes the selector list,
-  the exact-scope comparison keeps reporting drift after every fix.
-- a `branch_rules` entry naming an unsupported type, or naming one twice.
-- `branch_rules` without `pull_request`, an explicitly empty list
-  included. Every other supported type constrains how a branch changes,
-  not whether changes must arrive by pull request — deletion, linear
-  history, and signature rules all wave an ordinary direct push
-  through — so a baseline omitting `pull_request` produces branches
-  this command calls protected that anyone can push to. An absent
-  `branch_rules` key stays fine: the default includes `pull_request`.
-- `merge_methods` enabling no method at all. GitHub itself requires a
-  repository to keep at least one merge method, so Step 3's settings
-  `PATCH` would fail — and a `pull_request` rule needs a non-empty
-  `allowed_merge_methods` for the same reason.
-- `branch_rules` naming `required_linear_history` while merge commits are
-  the only method `merge_methods` enables. A merge commit is exactly what
-  linear history forbids, so the combination blocks every pull request:
-  the rule demands what the only allowed method cannot produce. Enable
-  squash or rebase, or drop the rule.
-
-## Step 1: Read the actual configuration
-
-Bind the target to the checkout before any read or write. `gh repo view`
-honors a `GH_REPO` override, and a relative `gh api` path goes to the
-CLI's default host — either can silently point every call, `--fix`
-writes included, at a repository other than the one whose baseline was
-just read. Resolve the host, owner, name, and whether the owner is an
-organization from the local Git remote, ignore `GH_REPO`, and pass the
-host to every call:
+## Step 1: Audit
 
 ```bash
-unset GH_REPO
-read -r HOST OWNER REPO IN_ORG < <(gh repo view \
-  --json url,owner,name,isInOrganization \
-  --jq '[(.url | sub("^https://"; "") | split("/")[0]),
-         .owner.login, .name, .isInOrganization] | @tsv')
-if [ -z "$HOST" ] || [ -z "$OWNER" ] || [ -z "$REPO" ] \
-  || [ -z "$IN_ORG" ]; then
-  echo "could not resolve the repository from the checkout" >&2
-  exit 1
-fi
-
-gh api --hostname "$HOST" "repos/$OWNER/$REPO" \
-  --jq '{allow_merge_commit, allow_squash_merge,
-  allow_rebase_merge, delete_branch_on_merge, allow_auto_merge}'
-ENABLED=$(gh api --hostname "$HOST" \
-  "repos/$OWNER/$REPO/actions/permissions" --jq '.enabled')
-if [ "$ENABLED" = false ]; then
-  echo "Actions is disabled; the token default governs nothing" >&2
-else
-  gh api --hostname "$HOST" \
-    "repos/$OWNER/$REPO/actions/permissions/workflow"
-fi
+PLAN="$(mktemp -d)/plan.json"
+node "$SCRIPT" audit --plan-out "$PLAN"
 ```
 
-The second call reads whether Actions is enabled on the repository, and
-the third reads the default `GITHUB_TOKEN` permissions and whether
-Actions may create and approve pull requests. Every workflow without a
-`permissions:` block runs with that token, and a repository created
-before 2023-02 kept a write default unless someone changed it, which is
-why the built-in baseline is `read`; the check itself compares the live
-value to whatever the baseline names. When `enabled` is false, whatever
-switched Actions off, no workflow runs and no token is issued, so the
-two fields govern nothing: the guard skips the third call, and the
-`actions` checks report as not applicable — not a pass, not drift —
-naming `https://$HOST/$OWNER/$REPO/settings/actions`, where Actions is
-turned back on. GitHub documents nothing about what the workflow
-endpoint answers for such a repository, and a sibling endpoint under
-`actions/permissions` has answered 409 with an empty body, which is why
-the enabled read comes first. The gate is the literal `false` and
-nothing else. `true` hands the decision to the workflow read, and so
-does a `null`, where the response carried no `enabled` key, or the
-error body `gh api` prints on stdout when the read failed: the workflow
-read's own answer is authoritative when it comes, and holding it would
-only shrink what the audit covers. A failed enabled read goes into the
-report as a note beside the endpoint and the API's message, not as a
-partial check.
+The script binds the target to the checkout — it drops `GH_REPO`, resolves
+the host, owner, name, and whether the owner is an organization through
+`gh repo view`, and passes the host to every call — then reads the
+repository settings, whether Actions is enabled and the token default when
+it is, every branch matching a protected pattern and its effective rules,
+and every branch ruleset including those inherited from the organization,
+each fetched in full through its own source's endpoint. It compares all of
+that to the baseline and writes the plan `--fix` would apply to `$PLAN`.
+Nothing is written to GitHub.
 
-Both reads need more than the read access the other Step 1 calls use:
-GitHub lists the endpoints under the repository Administration
-permission. A failed workflow read — a 403, a 404, or anything else
-that returns no JSON — means the two fields cannot be seen from here:
-report the `actions` checks as partial, never as a pass, naming the
-endpoint, quoting the API's message, and pointing at
-`https://$HOST/$OWNER/$REPO/settings/actions`, where the values can be
-read by hand. A 403 names the access it wants; a 404 says only that the
-endpoint was not visible from here. A failure repeating on every run
-means the account lacks the permission, and an administrator must run
-or confirm these lines.
+The output has `baseline` (its `source` and the `resolved` values),
+`repository`, `checks`, and `plan`. Each check carries an `id`, a `group`
+(`repository`, `actions`, `branch:<name>`, `pattern:<pattern>`, or
+`bypass`), a `label`, a `status`, and where they apply `expected`,
+`actual`, `detail`, and `where` — the settings page where the value is read
+or changed by hand. The statuses:
 
-With `GH_REPO` unset, `gh repo view` resolves from the checkout's Git
-remote through gh's own URL parser, which handles every remote form —
-scp-like `git@host:owner/repo.git`, `ssh://` with a port, `git://` —
-that a hand-rolled parse gets wrong; the canonical `url` it returns
-carries the host, and `isInOrganization` says whether `$OWNER` is an
-organization, which Step 3 needs to place a refused write. Validate all
-four values before the first call, and stop when any is empty.
+- `pass` — the setting matches the baseline.
+- `drift` — it does not. `detail` says how.
+- `partial` — it could not be read from here. The `detail` quotes the
+  endpoint's failure; `where` names the page to read it by hand. Never
+  report a partial check as a pass.
+- `not_applicable` — the Actions token fields while Actions is disabled:
+  no workflow runs and no token is issued, so the fields govern nothing.
+  `where` names the repository's Actions settings page and, in an
+  organization, the organization's too, since a policy there may be what
+  switched Actions off.
+- `note` — a pass with a stated remainder: a pattern matching no branch yet
+  while `branch_rules` lacks `creation`, or a bypass that another ruleset
+  still binds.
+- `unprovable` — a merge-method conflict that appears only once a ruleset
+  not provably overlapping the pattern joins the group. It is possible
+  rather than certain, and the plan treats it as unsafe to write.
 
-Every `gh api` call in this command takes `--hostname "$HOST"`. The
-snippets below leave it off to stay readable, but it is not optional:
-without it, the same owner and name on a different GitHub host is a
-different repository that answers just as happily.
-
-For each branch matching a protected pattern (resolve globs against
-`gh api "repos/$OWNER/$REPO/branches" --paginate`), read the rules in force.
-The branch name is a single path component of the endpoint, so
-percent-encode it — a slash in a matched branch such as `release/1.0`
-otherwise splits the path and the lookup fails:
-
-```bash
-set -o pipefail
-BRANCH_ENC=$(jq -rn --arg b "<branch>" '$b|@uri')
-gh api "repos/$OWNER/$REPO/rules/branches/$BRANCH_ENC" --paginate | jq -s 'add'
-```
-
-`pipefail` is not decoration: without it a failed `gh api` — a 403, a
-network drop — leaves `jq -s 'add'` printing `null` and exiting zero,
-and a failed read becomes indistinguishable from a branch with no
-rules. The two print differently as well: an empty rule list is `[]`,
-so treat `null` output as a failed read and stop, never as drift.
-
-Use this effective-rules endpoint, not the classic
-`branches/<branch>/protection` endpoint. Effective rules are readable with
-plain read access and include rules inherited from organization rulesets;
-the classic endpoint needs admin and sees only classic protection. The
-endpoint pages like the listings do, so `--paginate` fetches every page
-and the `jq -s 'add'` folds the per-page arrays into the one list the
-checks read — without them, a branch bound by more than a page of rules
-has its later rules read as absent, and the audit reports the wrong
-result. A branch with no rules returns an empty array — that is drift,
-not an error.
-
-Then read the branch rulesets, which Step 2 needs for the pattern-coverage
-check and Step 3 for the merge:
-
-```bash
-gh api "repos/$OWNER/$REPO/rulesets" --paginate \
-  --jq '.[] | select(.target == "branch")
-        | [.id, .source_type, .source, ._links.self.href] | @tsv'
-gh api "repos/$OWNER/$REPO/rulesets/<id>"   # source_type Repository only
-```
-
-Fetch each candidate through its source's endpoint. The repository
-endpoint above serves only `source_type: Repository` entries; an
-inherited `Organization` entry lives at `orgs/<source>/rulesets/<id>`,
-and the listing's `_links.self` already carries the right URL — follow
-it verbatim rather than rebuilding the path. A 403 or 404 on a parent
-fetch means that ruleset's conditions and rules cannot be read: report
-the audit as partial for it, naming the ruleset, rather than treating
-it as absent — an absent ruleset and an unreadable one support
-opposite conclusions. An unreadable parent also blocks writes, not just
-the report: without its conditions, merge methods, and bypasses, none
-of Step 3's compatibility preflights can prove a ruleset write or
-merge-method change safe — `--fix` could stack a rebase-only rule onto
-an unseen squash-only parent and block every pull request. While any
-applicable parent is unreadable, hold every ruleset write and the
-merge-method fields and report them as blocked on reading it;
-`delete_branch_on_merge` and `allow_auto_merge` carry no such
-dependency and still fix.
-
-Leave `includes_parents` at its default of `true`. The coverage check has
-to see rulesets inherited from the organization: an inherited ruleset
-protecting a pattern protects it as well as a repository one does, so a
-listing without parents would report that pattern as drift and have
-`--fix` create a redundant repository ruleset. Keep each ruleset's
-`source_type` — Step 3 needs it, because a repository `PUT` cannot update
-an `Organization` ruleset, so only `Repository` ones are merge candidates.
-`--paginate` keeps a ruleset past the first page from being missed and
-then duplicated by Step 3's create. The listing is an index only — it
-carries no `conditions`, so it cannot say which branches a ruleset
-targets. Fetch every branch-target candidate in full before comparing
-anything.
+The pattern checks audit the rulesets themselves, not the branches: a
+pattern matching no branch yet has no effective rules to read, so only the
+ruleset can show whether the first branch of that family will be born
+protected. Coverage counts only a literal `refs/heads/<pattern>` include or
+`~ALL`; a broader glob reports as drift even when it happens to cover, and
+`~DEFAULT_BRANCH` proves coverage of a branch, not of a pattern, since the
+guarantee would expire on a rename.
 
 ## Step 2: Compare and report
 
-Report a checklist, one line per checked setting, grouped as: repository
-settings, the Actions token default, then each protected branch. Mark
-each line pass, drift, partial, or not applicable, and for drift show
-expected vs actual. Checks:
+Report a checklist, one line per check, grouped as: repository settings,
+the Actions token default, each protected branch, each configured pattern,
+bypasses, then agent guidance (Step 4 defines that line). For drift show
+expected vs actual; for partial and not applicable, name `where`. When the
+Actions group is checked, say that it checks the default token only: a
+workflow that declares its own `permissions:` block gets what it declares,
+and a job-level block can still raise permissions above the default — a
+release workflow asking for `contents: write` is normal. Auditing each
+workflow's block is a lint concern and out of scope here.
 
-- Each merge method allowed on the repository matches `merge_methods`.
-- Each `repository` key matches.
-- Each `actions` key matches the workflow permissions read in Step 1.
-  While Step 1 found Actions disabled, the group reports as not
-  applicable instead, since a token no run receives cannot drift. Say
-  in the report that this checks the default token only: a workflow that
-  declares its own `permissions:` block gets what it declares, and a
-  job-level block can still raise permissions above the default — a
-  release workflow asking for `contents: write` is normal. Auditing each
-  workflow's block is a lint concern and out of scope here.
-- Each protected branch carries every rule type in `branch_rules`.
-- Where `pull_request` rules apply to a branch, the intersection of their
-  `allowed_merge_methods` permits no method `merge_methods` disables, and
-  is not empty. Intersect rather than judge each rule alone: GitHub
-  aggregates overlapping rulesets restrictively, so an inherited rule
-  allowing every method and a repository rule allowing only rebase leave
-  rebase as the effective set. The inherited rule stays visible in the
-  effective rules and cannot be edited from here, so reading it on its own
-  reports drift no fix can clear. The emptiness check matters because an
-  empty intersection passes the subset test vacuously — an inherited
-  squash-only rule against a rebase-only repository rule leaves no method
-  at all, and no pull request can merge; that is drift, not a pass. A
-  non-empty intersection can be just as unmergeable: where
-  `required_linear_history` is among the effective rules and the
-  intersection allows only merge commits, the one permitted method
-  produces exactly what linear history forbids. The baseline validation
-  rejects that combination in the baseline itself, but a stricter rule
-  recreates it — only `merge` kept from a merge-and-rebase baseline
-  passes the subset test and still blocks every pull request. Where
-  linear history is in force, the intersection must keep squash or
-  rebase; merge-only is drift.
-- Every configured pattern is covered: some active branch ruleset includes
-  it — as the literal `refs/heads/<pattern>`, or through `~ALL`, which
-  matches every branch — no exclusion in a covering ruleset overlaps
-  it — exclusions take precedence over includes — and the union of rules
-  across the covering rulesets carries every `branch_rules` type. The
-  literal pattern and `~ALL` are the only two selectors that count as
-  covering. Proving that one glob subsumes another is easy to get wrong,
-  so a merely broader pattern reports as drift even when it happens to
-  cover; and `~DEFAULT_BRANCH` proves coverage of a branch, not of a
-  pattern — it matches `main` only while `main` is the default, so the
-  guarantee this check makes would quietly expire on a rename. Where
-  rulesets applying to the pattern carry `pull_request` rules, the
-  intersection of their `allowed_merge_methods` gets the same subset,
-  non-emptiness, and linear-history checks as the per-branch audit
-  above — a squash-only `~ALL` ruleset against a rebase-only baseline
-  covers every rule type and still leaves the family's first branch with
-  no method to merge by, which is the same underprotection this check
-  exists to catch. And while coverage counts only the two selectors
-  above, this intersection cannot stop at the covering rulesets: a
-  ruleset whose selector overlaps the pattern without covering it —
-  squash-only `release/*` against a rebase-only `release/**/*`
-  baseline — binds every branch both patterns match, so `release/1.0`
-  would carry an empty effective merge set the moment it exists while a
-  covering-only check passes. Nor can every overlapping ruleset land in
-  one pooled intersection: rulesets that each overlap the pattern can be
-  disjoint from each other — a squash-only `release/one/*` and a
-  rebase-only `release/two/*` under that same baseline never bind one
-  branch — so pooling them reports an empty merge set no branch can ever
-  carry. Intersect per combination a single branch could meet: the
-  covering rulesets bind every branch of the family and always intersect
-  together, and each other active branch ruleset carrying a
-  `pull_request` rule joins them one group at a time, sharing a group
-  with further overlapping rulesets only when those are not provably
-  disjoint from each other as well. A ruleset stays out of every group
-  only when provably disjoint from the pattern, judged on includes and
-  exclusions together — an exclusion of the literal pattern or `~ALL`
-  removes the ruleset from the family however broad its includes look —
-  and disjoint meaning some segment position, before the first `**/` in
-  either pattern, where both patterns are wildcard-free literals that
-  differ, as `docs/*` is from `release/**/*` in the first. Positions
-  past a `**/` prove nothing: it can match zero or more segments and
-  shifts every alignment after it, so `foo/**/bar/**/*` and
-  `foo/bar/baz/*` differ at their third literals and still both match
-  `foo/bar/baz/qux`. Anything less certain intersects, and a conflict
-  that appears only once a not-provably-overlapping member joins the
-  group reports as not provably safe, naming the rulesets, rather than
-  as plain drift; treating an
-  unprovable overlap as safe is how this conflict hides until the first
-  branch of the family exists. Check
-  this against the rulesets themselves, not the branches: a pattern
-  matching no branch yet — `release/**/*` before the first release branch —
-  has no effective rules to read, so a branch-only audit finds nothing,
-  `--fix` sees no missing rule, and the first branch of that family is
-  created underprotected. Even full coverage leaves one gap to name:
-  rules bind operations on a branch, and only the `creation` rule
-  restricts bringing a matching branch into existence — a
-  `pull_request` rule does not stop `git push origin release/1.0` from
-  creating the branch with direct commits. Where a configured pattern
-  matches no existing branch and `branch_rules` does not name
-  `creation`, report that gap explicitly — a pass with a stated
-  remainder, never silence. Whether to add `creation` is the baseline
-  author's call: it closes the first-push hole and also blocks the
-  legitimate first push of every branch in the family, so the audit
-  reports the trade rather than deciding it.
-- No ruleset counted on for any check above grants a `bypass_actors`
-  entry whose `bypass_mode` is anything but `pull_request`. Rules bind
-  pushes, but an `always` bypass lets its actor push past every rule in
-  the ruleset, and an `exempt` actor is outside rule evaluation
-  altogether — no rules run for them and no bypass audit entry is
-  written — so the protection the checks credit that ruleset with is
-  advisory for that actor. A bypass is scoped to its own ruleset,
-  though, so judge what still binds the actor before calling it drift:
-  where every `branch_rules` type keeps binding them through some
-  co-applicable ruleset they cannot bypass, the protection holds and
-  the bypass is a note in the report, not drift. Report drift — naming
-  the ruleset, actor, and mode — only when the bypass leaves some
-  required rule unenforced for that actor; a `pull_request`-mode bypass
-  leaves direct pushes blocked and always passes. Even with `--fix`,
-  never edit a bypass list — a
-  bypass may be deliberate, so this drift ends in a question to the
-  user, and Step 3 refuses to merge the baseline into a ruleset carrying
-  one.
-- The project's agent instructions cover the protected branches — Step 4
-  defines this check and its fix.
+A `bypass` drift is a question for the user, never a fix: an `always`
+bypass lets its actor push past every rule in the ruleset and an `exempt`
+actor is outside rule evaluation altogether, but a bypass may be
+deliberate. Name the ruleset, actor, and mode, and ask.
+
+Then report `plan.held`: each entry lists the drifted checks `--fix`
+cannot clear, the `reason`, and `where` to make the change by hand. These
+are found-but-not-fixable: a conflicting rule in an organization ruleset or
+a broader repository ruleset this command will not loosen, a parent ruleset
+that could not be read and so blocks every ruleset write and merge-method
+change, or a token field whose endpoint could not be read.
 
 Finish the report with one line stating the baseline source: the guardrails
 file, or the built-in defaults.
 
 ## Step 3: Fix drift (only with --fix)
 
-Without `--fix`, stop after the report. With it, present the exact changes,
-then apply them. The writes lean on the baseline validation having already
-run — a baseline error surfacing between writes would leave a partial fix,
-which is why validation stops the run before Step 2 rather than merely
-before the first write:
+Without `--fix`, stop after the report. With it, present `plan.steps` in
+order — each step's `description`, and for a ruleset write its full `body`
+— alongside the held entries, so the user sees the whole coordinated plan
+and what it leaves alone. The plan is already safe to apply as a whole:
 
-- Repository settings and merge methods. Take every value from the resolved
-  baseline — the guardrails file where it sets a key, the built-in default
-  where it does not — and send only the fields that drifted:
+- Repository settings and the Actions token default are sent as the fields
+  that drifted, taking every value from the resolved baseline.
+- A merge-method change runs in two phases. Phase one widens: the settings
+  `PATCH` enables the union of today's methods and the baseline's, and
+  every qualifying ruleset's `pull_request` rule is rewritten to the union
+  of its current and target methods. Phase two narrows, only after every
+  widening write succeeded. No intermediate state empties the intersection
+  that decides which methods a pull request can use.
+- Branch rules are merged into an existing repository ruleset only when it
+  is active, targets branches, includes exactly the resolved patterns and
+  nothing more, excludes nothing, and carries no bypass other than
+  `pull_request` mode. Merging adds the missing rule types and drops from
+  its `pull_request` rule any method the baseline disables, keeping a
+  stricter list as it is. When no ruleset qualifies, one named
+  `Protected branch guardrails` is created with exactly the baseline's
+  patterns and rules. Nothing the baseline does not mention is removed or
+  loosened, and a bypass list is never edited.
+- Before planning any ruleset write, the script computes the merge-method
+  intersection of every group of rules a single branch could meet as it
+  would stand after the writes. An empty intersection, or merge-only under
+  linear history, means the plan would preserve the unmergeable state the
+  audit flagged: those writes are held instead, with the rules named.
 
-  ```bash
-  gh api -X PATCH "repos/$OWNER/$REPO" \
-    -F allow_merge_commit=<merge_methods.merge> \
-    -F allow_squash_merge=<merge_methods.squash> \
-    -F allow_rebase_merge=<merge_methods.rebase> \
-    -F delete_branch_on_merge=<repository.delete_branch_on_merge> \
-    -F allow_auto_merge=<repository.allow_auto_merge>
-  ```
+Rulesets are outward-facing repository configuration. When
+`plan.confirm_required` is true, get the user's confirmation of the whole
+plan before the first write — the widening `PATCH` included, since
+confirming only the ruleset write would let a decline strand the repository
+half-transitioned. Confirmation can take arbitrarily long, so after it, and
+before applying, re-run the Step 4 discovery and classification over the
+plan's local inputs — the baseline file and every instruction source the
+classification read — because an import, a nested instruction file, or a
+file created during the wait can reclassify a chain. Then apply:
 
-  Preflight the three merge-method fields before sending them. A pull
-  request's usable methods are the intersection of these settings with
-  every applicable `pull_request` rule, so no intermediate state may
-  empty that intersection — and with several qualifying rulesets in
-  play, rewriting them one at a time does exactly that: narrowing the
-  first of two squash-only rulesets to rebase empties the intersection
-  until the second write lands, and leaves it empty if that write
-  fails. Run the whole merge-method transition in two phases. Phase one
-  widens: `PATCH` the settings to the union of the baseline methods and
-  the methods enabled today, and rewrite every qualifying ruleset's
-  `pull_request` rule to the union of its current and target methods —
-  enabling, never yet disabling. If any widening write fails, abort the
-  whole coordinated transition and report it; a fully or partly widened
-  state blocks nothing, while narrowing after a failed widening is how
-  two formerly squash-only rulesets end up rebase-only against
-  squash-only and block every pull request. The continue-past-refusals
-  rule below covers unrelated writes only — never the remaining steps
-  of a transition whose widening failed.
-  Phase two narrows, only after every widening succeeded: rewrite each
-  rule down to its target methods, then `PATCH` the settings down to
-  exactly the baseline. Only when a conflicting rule is not writable
-  from here — an inherited squash-only rule, already reported as
-  found-but-not-fixable — is there no safe sequence at all: hold the
-  merge-method fields, report them as blocked on that rule, and send
-  the fields that carry no merge-method risk —
-  `delete_branch_on_merge` and `allow_auto_merge` — on their own.
+```bash
+node "$SCRIPT" apply "$PLAN"
+```
 
-- The Actions token default. One idempotent `PUT` per field that
-  drifted, its value taken from the resolved baseline. The body accepts
-  either field alone, and one field per write is what lets a refusal
-  name the field it refused. Run only the command for a field that
-  drifted:
+The script repeats every read first and compares the result to the state
+the plan was built from, leaving out the branches the baseline does not
+protect, so a topic branch pushed or deleted during the wait changes
+nothing. Exit 3 means something else differs: another administrator was
+here, or the baseline file changed. The output carries a fresh audit;
+report that, rebuild the plan from a new `audit` run, and confirm again
+rather than writing over their change.
 
-  ```bash
-  gh api -X PUT "repos/$OWNER/$REPO/actions/permissions/workflow" \
-    -f default_workflow_permissions=<actions.default_workflow_permissions>
-  gh api -X PUT "repos/$OWNER/$REPO/actions/permissions/workflow" \
-    -F can_approve_pull_request_reviews=<actions.can_approve_pull_request_reviews>
-  ```
+Otherwise the output has `steps`, one result per planned step, and
+`audit`, the checklist re-read after the writes. Report each step by its
+`status`:
 
-  They touch no ruleset and no merge method, so they carry no
-  intermediate-state risk and go with the settings that fix on their
-  own. They do depend on Step 1's read of the same endpoint: while that
-  read failed, the drift is unknown, and the re-read that would confirm
-  a write fails the same way. Hold both writes and report both fields
-  as blocked on reading the endpoint, as ruleset writes are held while
-  a parent is unreadable. While Step 1 found Actions disabled there is
-  nothing to write: send neither `PUT`, and report both fields as not
-  applicable, as Step 2 does.
+- `applied` — the write succeeded and the re-read confirmed it.
+- `refused` — 403 or 404: admin access is missing. Report the drift as
+  found-but-not-fixable and name the page in `where`. One refused write
+  does not abort the rest; the output shows every fix that landed beside
+  every one that needs the browser.
+- `capped` — a 409 on a loosening Actions write in an organization-owned
+  repository: the organization caps that field. Name the organization's
+  Actions settings page from `where`, or its enterprise's where the
+  organization inherits the value.
+- `failed` — any other error, with GitHub's status and message. A 409 on a
+  tightening write, or on a user-owned repository, has no documented
+  cause: report the message as given and do not explain it.
+- `skipped` — not attempted, with the `reason`: the coordinated transition
+  was aborted because a widening write failed, or a ruleset write was held
+  because the settings `PATCH` was refused and the rule would leave every
+  matched branch with no usable merge method.
+- `unverified` — the write returned success but the re-read failed; the
+  `message` quotes the API.
 
-  An organization caps each of the two fields on its own — a repository
-  may not grant the token more than the organization allows, and may not
-  let Actions approve pull requests when the organization forbids it —
-  and neither cap is visible in the repository read. Only a baseline
-  asking for `write` or `true` can meet a cap, since an organization
-  restricts and never loosens; with the built-in defaults no cap can be
-  met. The `PUT` answers 409 when the owning organization prevents the
-  change, and with one field per write the 409 names the capped field by
-  itself. Report that field on its own line, as Step 2 lists them, as
-  found-but-not-fixable — not a pass, and not a failed fix — and name
-  where it is changed: the owning organization's Actions settings,
-  `https://$HOST/organizations/$OWNER/settings/actions`, or its
-  enterprise's where the organization inherits the value, the same way
-  an inherited ruleset is reported as the organization's to edit. The
-  cap is the only cause GitHub documents for the 409, and Step 1 has
-  already ruled out disabled Actions, so while `$IN_ORG` is `true`,
-  `$OWNER` is the organization. While it is `false` the repository
-  belongs to a user and a 409 has no documented cause: report the status
-  and GitHub's message, if there is one, as found-but-not-fixable beside
-  `https://$HOST/$OWNER/$REPO/settings/actions`, and do not explain it.
-
-  A read straight after a 204 can lag the write, as the end of this
-  step records, so after the writes re-read until every written field
-  matches, up to five reads a second apart:
-
-  ```bash
-  WANT=$(printf '%s\t%s' <expected default_workflow_permissions> \
-    <expected can_approve_pull_request_reviews>)
-  for attempt in 1 2 3 4 5; do
-    if ! LIVE=$(gh api "repos/$OWNER/$REPO/actions/permissions/workflow" \
-      --jq '[.default_workflow_permissions,
-             .can_approve_pull_request_reviews] | @tsv'); then
-      echo "re-read failed on attempt $attempt: $LIVE" >&2
-      break
-    fi
-    [ "$LIVE" = "$WANT" ] && break
-    sleep 1
-  done
-  ```
-
-  Each expected value is the baseline's for a field whose `PUT`
-  answered 204 and Step 1's live value for any other, so a capped field
-  is not waited on. When the read fails, `$LIVE` holds the error body
-  `gh api` prints: report both fields as blocked on reading the
-  endpoint, with that message, as Step 1 does, and not as drift. A
-  field that still differs after the fifth read is a failed fix, not a
-  cap: GitHub documents no such outcome, so report what the last read
-  shows and do not explain it.
-
-- Branch rules need a repository ruleset — one of those Step 1 fetched.
-  Merge the baseline into an existing ruleset only when all of these hold:
-  its `source_type` is `Repository` — Step 1's listing includes inherited
-  rulesets, and a repository `PUT` cannot update an `Organization` one —
-  its `target` is `branch`, its enforcement is `active`, its `ref_name`
-  include list is exactly the resolved patterns as `refs/heads/<pattern>` —
-  all of them and nothing more — its `ref_name` exclude list is empty,
-  since exclusions take precedence over includes: a ruleset excluding
-  `main` leaves `main` unprotected however exact its include list looks —
-  and no `bypass_actors` entry carries a `bypass_mode` other than
-  `pull_request`. The merge below preserves `bypass_actors` verbatim; an
-  `always` bypass lets that actor push straight past every rule the
-  merge would add, and an `exempt` one leaves the actor outside rule
-  evaluation entirely — no rules run for them, and no bypass audit entry
-  records it — so folding the baseline into such a ruleset claims a
-  server-side guarantee one actor can walk around. Only a
-  `pull_request`-mode bypass keeps direct pushes blocked and does not
-  disqualify. Each condition
-  rules out a way the merge
-  goes wrong. A tag or push ruleset can carry matching ref-name conditions
-  and still reject a `pull_request` rule, leaving branch protection unfixed.
-  A broader ruleset — one targeting `~ALL`, or carrying include patterns
-  outside the baseline — would impose the baseline on every branch it
-  covers, and a narrower or disabled one leaves protected branches uncovered
-  while looking handled. A ruleset conditioned on `~DEFAULT_BRANCH` is not
-  exact scope either: that token follows a default-branch rename while the
-  baseline and the generated guidance still name the old branch. Leave any
-  of these alone and create the dedicated ruleset below instead.
-
-  To merge, build a complete replacement from the writable fields of the
-  fetched ruleset — `name`, `target`, `enforcement`, `bypass_actors`,
-  `conditions`, `rules` — with the changes below applied, and send it with
-  `PUT repos/$OWNER/$REPO/rulesets/<id>`. PUT replaces the ruleset, so any
-  writable field left out is lost — but the GET response also carries
-  response-only fields (`id`, `source`, `_links`, timestamps) the update
-  schema rejects, so echoing it back verbatim fails validation.
-  Merging means: add each
-  `branch_rules` type the ruleset lacks, a parameterless type as a bare
-  object but a missing `pull_request` rule with the complete parameter block
-  from the creation payload below, since the API rejects that one bare; and
-  drop from an existing `pull_request` rule's `allowed_merge_methods` any
-  method `merge_methods` disables, keeping the rest of its list as it is —
-  the audit accepts a subset stricter than the baseline, so rewriting the
-  list to every enabled method would loosen a deliberately tighter rule. If
-  the drop empties the list, the rule and the baseline share no method: use
-  exactly the methods `merge_methods` enables instead — a `pull_request`
-  rule must allow at least one, and the up-front validation guarantees there
-  is one. Narrowing the repository's own rule is the whole fix, because the
-  effective set is the intersection: a rule elsewhere allowing more needs
-  no change. Planning each rule alone is not enough, though: two
-  stricter subsets can each be valid and jointly empty — a squash-only
-  and a rebase-only rule under a squash-plus-rebase baseline both
-  survive the drop unchanged and intersect to nothing — and adding
-  `required_linear_history` can leave a merge-only intersection that
-  linear history forbids. Before writing anything, compute the
-  effective intersection of every co-applicable `pull_request` rule as
-  it will stand after the planned writes. If that intersection is
-  empty, or merge-only while linear history will be in force, the plan
-  preserves exactly the unmergeable state the audit flagged: do not
-  write it. The stricter lists belong to someone, so reconciling them
-  is the user's call — report the group as found-but-not-fixable,
-  naming the rules. When the drift runs the other way — some other applicable
-  `pull_request` rule allows no method the baseline enables, so the
-  effective intersection stays empty whatever this ruleset says — first
-  check where that rule lives. The merge criteria above select a set,
-  not a single winner: several rulesets can satisfy every one of them,
-  so enumerate the qualifying rulesets and apply the same merge to each.
-  Two writable exact-scope squash-only rulesets under a rebase-only
-  baseline both get rewritten and the drift clears — updating one and
-  calling the other unfixable leaves the branches exactly as
-  unmergeable as before. Only a conflict in a ruleset the criteria
-  leave alone is beyond this command: report it found-but-not-fixable,
-  naming the ruleset — it lives in organization configuration this
-  command cannot write, or in a broader repository ruleset — a `~ALL`
-  ruleset allowing only squash against a rebase-only baseline, say —
-  and loosening either is not this command's call. An intersection that
-  survives non-empty can be just as stuck: with
-  `required_linear_history` in force, a stricter unwritable rule
-  leaving only merge commits blocks every pull request, and widening it
-  would loosen a deliberately tighter rule — the same verdict,
-  found-but-not-fixable, naming the rule. Never
-  remove or loosen rules the baseline does not mention.
-
-  If no ruleset qualifies, create one — after the same compatibility
-  preflight the merge runs. When an applicable `pull_request` rule this
-  command cannot write shares no method with the baseline — the
-  inherited squash-only rule against a rebase-only baseline above — a
-  new baseline ruleset would stack its rebase-only rule on top of that
-  one and empty the effective intersection, blocking every pull request
-  on the branches both bind. Report that drift as still unfixed,
-  blocked on the unwritable rule, and skip the create; it runs only
-  when, for every co-applicable group, the intersection of all the
-  unwritable applicable rules with the baseline methods stays
-  non-empty — and keeps squash or rebase where linear history will be
-  in force. Checking each rule on its own is not enough: an inherited
-  squash-only rule and an inherited rebase-only rule each keep a method
-  of a squash-plus-rebase baseline while their combined set is empty,
-  and the created ruleset would land on a pattern that stays
-  unmergeable. The JSON below is what the built-in
-  defaults produce — build the actual payload from the resolved baseline:
-  one `rules` entry per `branch_rules` type, with `allowed_merge_methods`
-  listing exactly the enabled `merge_methods`:
-
-  ```bash
-  gh api -X POST "repos/$OWNER/$REPO/rulesets" --input - <<'EOF'
-  {
-    "name": "Protected branch guardrails",
-    "target": "branch",
-    "enforcement": "active",
-    "conditions": {
-      "ref_name": {
-        "include": ["refs/heads/main", "refs/heads/master"],
-        "exclude": []
-      }
-    },
-    "rules": [
-      { "type": "deletion" },
-      { "type": "non_fast_forward" },
-      { "type": "required_linear_history" },
-      {
-        "type": "pull_request",
-        "parameters": {
-          "required_approving_review_count": 0,
-          "dismiss_stale_reviews_on_push": true,
-          "require_code_owner_review": false,
-          "require_last_push_approval": false,
-          "required_review_thread_resolution": false,
-          "allowed_merge_methods": ["rebase"]
-        }
-      }
-    ]
-  }
-  EOF
-  ```
-
-  Adjust `include` to the resolved patterns — one `refs/heads/<pattern>`
-  entry each, every pattern copied verbatim, since the baseline already uses
-  ruleset syntax, where `*` stays within a path segment and only `**/`
-  crosses `/`. Never substitute `~DEFAULT_BRANCH` for a literal pattern: it follows
-  a default-branch rename, and the ruleset would then enforce a branch
-  neither the baseline nor the agent guidance names.
-
-- The settings `PATCH`, the Actions `PUT`, and the ruleset writes all
-  need admin. When any of them returns 403 or 404, report that drift as
-  found-but-not-fixable, name the settings page —
-  `https://$HOST/$OWNER/$REPO/settings` for the `PATCH`,
-  `https://$HOST/$OWNER/$REPO/settings/actions` for the `PUT`,
-  `https://$HOST/$OWNER/$REPO/settings/rules` for a ruleset — and
-  continue with the writes that remain. One refused write
-  does not abort the run: the settings `PATCH` failing says nothing about
-  whether the ruleset write would, and the report should show every fix
-  that landed alongside every one that needs the browser. The exception
-  is a write the failure invalidates. A `pull_request` rule's usable
-  methods are the intersection of its `allowed_merge_methods` with the
-  methods the repository itself enables, so after a refused settings
-  `PATCH`, re-read the repository settings before any ruleset write: a
-  rule sharing no method with what the repository still enables — a
-  rebase-only rule landing on a repository the failed `PATCH` left
-  squash-only — would leave every matched branch unmergeable. Hold that
-  ruleset write, report it as blocked on the settings fix, and continue
-  with the writes that do not depend on it.
-
-Rulesets are outward-facing repository configuration: even with `--fix`,
-show the whole coordinated plan — the ruleset JSON and every settings
-`PATCH` it depends on — and get the user's confirmation before the first
-dependent write, the phase-one widening `PATCH` included. Confirming
-only the ruleset write would let a decline strand the repository
-half-transitioned, its settings already widened for a ruleset change
-that never happens. Confirmation can take arbitrarily long, and a `PUT`
-payload built from the earlier GET replaces every writable field — so
-after confirmation and before executing, re-run the Step 1 reads in
-full — the repository settings, the Actions token default, the ruleset
-listing with parents included, and re-run the Step 4 discovery and
-classification over the plan's local inputs too: the baseline file and
-every instruction source the classification read, not only the guidance
-targets the plan would write, whose ownership hashes were computed
-against pre-confirmation text — an import, a nested instruction file,
-or a file created during the wait can reclassify a chain while every
-planned target sits untouched. Compare all of it against the state the
-plan was built from. Re-fetching only the objects the plan touches is
-not enough: a ruleset another administrator created or changed during
-the wait can invalidate the compatibility calculation while every
-touched object reads back unchanged. If anything differs, another
-administrator was here: rebuild the plan from the fresh state — the
-merge-method safety calculation included — and confirm again rather
-than silently overwriting their change. After applying, re-run the read
-commands and report the checklist again so the fix is verified, not
-assumed. A read straight after a successful write can lag it: the
-Actions `PUT` has returned the old value within a second of a 204 and
-the new one a read later. A line that still drifts right after a
-successful write is therefore re-read until it matches, up to five
-reads a second apart, and reported as a failed fix only after the
-fifth; a re-read that errors is reported as blocked on reading the
-endpoint, with the API's message, and not as drift.
+The Actions endpoint can lag its own write, so the script re-reads a
+written field until it matches, up to five reads a second apart, and
+reports a failed fix only after the fifth. Finish by reporting the
+checklist from the returned `audit`, so the fix is verified, not assumed.
 
 ## Step 4: Agent guidance
 
@@ -876,99 +389,72 @@ the protected branches:
   baseline may be the thing that is stale. Even with `--fix`, a conflict
   ends in a question to the user, not an edit.
 
-With `--fix`, only the **Missing** case writes, once per missing chain —
-but chains can resolve to the same file: a root `CLAUDE.md` that defers
-to `AGENTS.md` makes that one file both the Claude Code target and the
-`AGENTS.md` target. Collect every target path first, deduplicate, and
-write one block per file — a second marked block in the same file
-leaves two marker pairs the later ownership check cannot tell apart.
-Deduplication only keeps this run from writing duplicates; the file may
-already be malformed. Before classifying or writing anything, check
-each target's marker structure: exactly zero or one begin/end pair,
-matched and in order. Duplicate, nested, or unmatched markers make
-"the found block" ambiguous — never edit such a file, and report it
-for manual cleanup instead.
-Append the marked block to the file each chain's conventions point at —
-for Claude Code the root `CLAUDE.md` when nothing says otherwise, for
-the Copilot chain `.github/copilot-instructions.md` itself, and
-for the `AGENTS.md` chain the root `AGENTS.md`, created when the chain
-lives only in nested files — a nested file governs only its subtree,
-so appending to the topmost nested file would leave every sibling and
-root scope bare, and once any AGENTS mechanism is tracked,
-repository-wide coverage needs the root file — plus each tracked
-`AGENTS.md` or `AGENTS.override.md` whose own text omits the rule, so
-the nearest-file reading carries it in every scope, not only the
-cumulative one. A nested file that conflicts is different: that is a
-**Conflicting** classification and ends in a question, not a write. A
-mechanism the
-repository does not carry is no chain at all: a repository with no
-tracked `AGENTS.md` anywhere is audited on the Claude Code chain
-alone, and no file is created to start one.
+### The guidance block
 
-A file the fix creates starts untracked, and the tracked-only audit
-would classify its chain as Missing all over again on the post-fix
-rerun — so stage the files the confirmed fix creates, and the rerun
-sees them. The reverse case is off limits: a pre-existing untracked
-file already sitting at a target path is the user's unfinished work.
-Never edit or stage it; report the guidance fix as pending until the
-user tracks or removes that file.
+The fix for a **Missing** chain is a marked block of canonical text, and
+the script owns its bytes: the opening marker carries a hash of the body,
+which is how a later run tells untouched machine output from a user's
+edit. Before classifying a file's text, ask the script what it finds:
 
-The block's text is canonical, not free prose:
-the stale check below compares bytes, so every run must render the same
-baseline to the same bytes. The text is exactly these three lines, with
-`<patterns>` substituted and nothing rewrapped, however long the pattern
-list makes the first line:
-
-```text
-Never commit or push to <patterns>. Create a topic branch
-first (`git switch -c <type>/<short-description>`) and open a pull
-request instead.
+```bash
+node "$SCRIPT" guidance render            # the block the current baseline produces
+node "$SCRIPT" guidance inspect <file>    # what a file carries, and where the path really points
 ```
 
-`<patterns>` renders the resolved patterns in baseline order — the
-guardrails file's order, or `main` then `master` from the defaults —
-each in backticks and joined by count: one pattern stands alone, two
-read `` `a` or `b` ``, and three or more read `` `a`, `b`, or `c` `` —
-a comma after every pattern but the last, and "or" before the last. A
-`main` plus `release/**/*` baseline therefore produces exactly:
+`inspect` reports the file's resolved path, whether it is inside the
+repository and tracked, and a `classification`:
 
-```markdown
-<!-- jcouball-github guardrails: begin sha256:<hash> -->
-Never commit or push to `main` or `release/**/*`. Create a topic branch
-first (`git switch -c <type>/<short-description>`) and open a pull
-request instead.
-<!-- jcouball-github guardrails: end -->
-```
-
-`<hash>` is the first 12 lowercase hex digits of the SHA-256 of the
-three lines between the markers, each line including its terminating
-newline — the last one too — and the markers excluded (`shasum -a 256`
-or `sha256sum` over exactly those bytes). That hash is the ownership
-signal: on a later run,
-before classifying a found block, recompute the hash of its current text
-and compare.
-
-- Hash matches → the block is untouched machine output. Compare it to
-  what the current baseline generates: identical → **Covered**; different
-  → the block is stale, and `--fix` rewrites the block — the three body
-  lines and the opening marker both, since the marker carries the hash.
-  Rewriting only the text between the markers leaves the old hash
-  behind, and the next audit reads the mismatch as a user edit. This
-  exact-regeneration comparison — not the semantic
-  classification above — is how a changed baseline propagates.
-- Hash differs → someone edited the block and it is now the user's prose:
-  classify it semantically like any other text and never rewrite it —
-  and never append beside it either. Whatever the classification, a
-  file already carrying a marker pair is closed to the Missing write:
-  appending a second block would manufacture the duplicate-marker state
-  the structure check above refuses to touch. When such a file's chain
+- `absent` — no markers. Classify the text semantically as above.
+- `machine-current` — an untouched block matching the current baseline.
+  The chain is **Covered** by it.
+- `machine-stale` — an untouched block from an earlier baseline. This is
+  how a changed baseline propagates: report it as drift, and `--fix`
+  rewrites the block, marker and body both.
+- `edited` — the block's text no longer matches its hash, so it is the
+  user's prose now. Classify it semantically and never rewrite it. A file
+  carrying a marker pair is also closed to a new block: when its chain
   still misses the rule, report the file for manual cleanup.
+- `malformed` — duplicate, nested, or unmatched markers. Never edit such a
+  file; report it for manual cleanup.
+- `external` — the path resolves outside the repository. Note it and
+  never read it.
+
+With `--fix`, write only the **Missing** chains and the stale blocks, once
+per target file. Chains can resolve to the same file — a root `CLAUDE.md`
+that defers to `AGENTS.md` makes that one file both the Claude Code target
+and the `AGENTS.md` target — so collect every target path first,
+deduplicate, and run one write per file:
+
+```bash
+node "$SCRIPT" guidance write <file>
+```
+
+The targets are the file each chain's conventions point at: for Claude
+Code the root `CLAUDE.md` when nothing says otherwise, for the Copilot
+chain `.github/copilot-instructions.md` itself, and for the `AGENTS.md`
+chain the root `AGENTS.md`, created when the chain lives only in nested
+files — a nested file governs only its subtree, so appending to the
+topmost nested file would leave every sibling and root scope bare — plus
+each tracked `AGENTS.md` or `AGENTS.override.md` whose own text omits the
+rule, so the nearest-file reading carries it in every scope. A mechanism
+the repository does not carry is no chain at all: a repository with no
+tracked `AGENTS.md` anywhere is audited on the Claude Code chain alone,
+and no file is created to start one.
+
+`write` appends the block to a file without markers, creating the file
+when it does not exist, and rewrites a stale block in place. It exits 4
+and writes nothing when the path resolves outside the repository, when a
+file already at the path is untracked — that is the user's unfinished
+work; report the fix as pending until they track or remove it — or when
+the block is edited or the markers malformed. A file the fix creates
+starts untracked, and the tracked-only audit would classify its chain as
+Missing all over again on the post-fix rerun, so stage the files the
+confirmed fix creates.
 
 A deleted block leaves no trace, so a repository without one is simply
 classified by the rules above — usually **Missing**, which means `--fix`
 appends the block again. To keep the guidance out for good, replace the
 block with your own wording instead of deleting it: hand-written text
 classifies as **Covered** or **Conflicting** and is never overwritten.
-
-Text outside the markers always belongs to the user and only ever gets
-the semantic classification above.
+Text outside the markers always belongs to the user and only ever gets the
+semantic classification above.
