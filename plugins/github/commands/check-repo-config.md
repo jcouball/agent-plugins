@@ -142,15 +142,18 @@ Bind the target to the checkout before any read or write. `gh repo view`
 honors a `GH_REPO` override, and a relative `gh api` path goes to the
 CLI's default host — either can silently point every call, `--fix`
 writes included, at a repository other than the one whose baseline was
-just read. Resolve the host, owner, and name from the local Git remote,
-ignore `GH_REPO`, and pass the host to every call:
+just read. Resolve the host, owner, name, and whether the owner is an
+organization from the local Git remote, ignore `GH_REPO`, and pass the
+host to every call:
 
 ```bash
 unset GH_REPO
-read -r HOST OWNER REPO < <(gh repo view --json url,owner,name \
+read -r HOST OWNER REPO IN_ORG < <(gh repo view \
+  --json url,owner,name,isInOrganization \
   --jq '[(.url | sub("^https://"; "") | split("/")[0]),
-         .owner.login, .name] | @tsv')
-if [ -z "$HOST" ] || [ -z "$OWNER" ] || [ -z "$REPO" ]; then
+         .owner.login, .name, .isInOrganization] | @tsv')
+if [ -z "$HOST" ] || [ -z "$OWNER" ] || [ -z "$REPO" ] \
+  || [ -z "$IN_ORG" ]; then
   echo "could not resolve the repository from the checkout" >&2
   exit 1
 fi
@@ -158,32 +161,58 @@ fi
 gh api --hostname "$HOST" "repos/$OWNER/$REPO" \
   --jq '{allow_merge_commit, allow_squash_merge,
   allow_rebase_merge, delete_branch_on_merge, allow_auto_merge}'
-gh api --hostname "$HOST" "repos/$OWNER/$REPO/actions/permissions/workflow"
+ENABLED=$(gh api --hostname "$HOST" \
+  "repos/$OWNER/$REPO/actions/permissions" --jq '.enabled')
+if [ "$ENABLED" = false ]; then
+  echo "Actions is disabled; the token default governs nothing" >&2
+else
+  gh api --hostname "$HOST" \
+    "repos/$OWNER/$REPO/actions/permissions/workflow"
+fi
 ```
 
-The second call reads the default `GITHUB_TOKEN` permissions and
-whether Actions may create and approve pull requests. Every workflow
-without a `permissions:` block runs with that token, and a repository
-created before 2023-02 kept a write default unless someone changed it,
-which is why the built-in baseline is `read`; the check itself compares
-the live value to whatever the baseline names. This read needs more
-than the read access the other Step 1 calls use: GitHub lists the
-endpoint under the repository Administration permission. A failed
-read — a 403, a 404, or anything else that returns no JSON — means the
-two fields cannot be seen from here: report the `actions` checks as
-partial, never as a pass, naming the endpoint, quoting the API's
-message, and pointing at `https://$HOST/$OWNER/$REPO/settings/actions`,
-where the values can be read by hand. A 403 names the access it wants;
-a 404 says only that the endpoint was not visible from here. A failure
-repeating on every run means the account lacks the permission, and an
-administrator must run or confirm these lines.
+The second call reads whether Actions is enabled on the repository, and
+the third reads the default `GITHUB_TOKEN` permissions and whether
+Actions may create and approve pull requests. Every workflow without a
+`permissions:` block runs with that token, and a repository created
+before 2023-02 kept a write default unless someone changed it, which is
+why the built-in baseline is `read`; the check itself compares the live
+value to whatever the baseline names. When `enabled` is false, whatever
+switched Actions off, no workflow runs and no token is issued, so the
+two fields govern nothing: the guard skips the third call, and the
+`actions` checks report as not applicable — not a pass, not drift —
+naming `https://$HOST/$OWNER/$REPO/settings/actions`, where Actions is
+turned back on. GitHub documents nothing about what the workflow
+endpoint answers for such a repository, and a sibling endpoint under
+`actions/permissions` has answered 409 with an empty body, which is why
+the enabled read comes first. The gate is the literal `false` and
+nothing else. `true` hands the decision to the workflow read, and so
+does a `null`, where the response carried no `enabled` key, or the
+error body `gh api` prints on stdout when the read failed: the workflow
+read's own answer is authoritative when it comes, and holding it would
+only shrink what the audit covers. A failed enabled read goes into the
+report as a note beside the endpoint and the API's message, not as a
+partial check.
+
+Both reads need more than the read access the other Step 1 calls use:
+GitHub lists the endpoints under the repository Administration
+permission. A failed workflow read — a 403, a 404, or anything else
+that returns no JSON — means the two fields cannot be seen from here:
+report the `actions` checks as partial, never as a pass, naming the
+endpoint, quoting the API's message, and pointing at
+`https://$HOST/$OWNER/$REPO/settings/actions`, where the values can be
+read by hand. A 403 names the access it wants; a 404 says only that the
+endpoint was not visible from here. A failure repeating on every run
+means the account lacks the permission, and an administrator must run
+or confirm these lines.
 
 With `GH_REPO` unset, `gh repo view` resolves from the checkout's Git
 remote through gh's own URL parser, which handles every remote form —
 scp-like `git@host:owner/repo.git`, `ssh://` with a port, `git://` —
 that a hand-rolled parse gets wrong; the canonical `url` it returns
-carries the host. Validate all three values before the first call, and
-stop when any is empty.
+carries the host, and `isInOrganization` says whether `$OWNER` is an
+organization, which Step 3 needs to place a refused write. Validate all
+four values before the first call, and stop when any is empty.
 
 Every `gh api` call in this command takes `--hostname "$HOST"`. The
 snippets below leave it off to stay readable, but it is not optional:
@@ -264,11 +293,14 @@ anything.
 
 Report a checklist, one line per checked setting, grouped as: repository
 settings, the Actions token default, then each protected branch. Mark
-each line pass or drift, and for drift show expected vs actual. Checks:
+each line pass, drift, partial, or not applicable, and for drift show
+expected vs actual. Checks:
 
 - Each merge method allowed on the repository matches `merge_methods`.
 - Each `repository` key matches.
-- Each `actions` key matches the workflow permissions read in Step 1. Say
+- Each `actions` key matches the workflow permissions read in Step 1.
+  While Step 1 found Actions disabled, the group reports as not
+  applicable instead, since a token no run receives cannot drift. Say
   in the report that this checks the default token only: a workflow that
   declares its own `permissions:` block gets what it declares, and a
   job-level block can still raise permissions above the default — a
@@ -450,27 +482,33 @@ before the first write:
   read failed, the drift is unknown, and the re-read that would confirm
   a write fails the same way. Hold both writes and report both fields
   as blocked on reading the endpoint, as ruleset writes are held while
-  a parent is unreadable.
+  a parent is unreadable. While Step 1 found Actions disabled there is
+  nothing to write: send neither `PUT`, and report both fields as not
+  applicable, as Step 2 does.
 
   An organization caps each of the two fields on its own — a repository
   may not grant the token more than the organization allows, and may not
   let Actions approve pull requests when the organization forbids it —
   and neither cap is visible in the repository read. Only a baseline
   asking for `write` or `true` can meet a cap, since an organization
-  restricts and never loosens; with the built-in defaults nothing in
-  this paragraph applies. The `PUT` answers 409 when the owning
-  organization prevents the change, and with one field per write the
-  409 names the capped field by itself. Report that field on its own
-  line, as Step 2 lists them, as found-but-not-fixable — not a pass,
-  and not a failed fix — and name where it is changed: the owning
-  organization's Actions settings,
+  restricts and never loosens; with the built-in defaults no cap can be
+  met. The `PUT` answers 409 when the owning organization prevents the
+  change, and with one field per write the 409 names the capped field by
+  itself. Report that field on its own line, as Step 2 lists them, as
+  found-but-not-fixable — not a pass, and not a failed fix — and name
+  where it is changed: the owning organization's Actions settings,
   `https://$HOST/organizations/$OWNER/settings/actions`, or its
   enterprise's where the organization inherits the value, the same way
-  an inherited ruleset is reported as the organization's to edit. A 409
-  comes only from an organization-owned repository, so `$OWNER` there
-  is the organization. A field that still drifts on the post-apply
-  re-read after a 204 is a failed fix, not a cap: GitHub documents no
-  such outcome, so report what the re-read shows and do not explain it.
+  an inherited ruleset is reported as the organization's to edit. The
+  cap is the only cause GitHub documents for the 409, and Step 1 has
+  already ruled out disabled Actions, so while `$IN_ORG` is `true`,
+  `$OWNER` is the organization. While it is `false` the repository
+  belongs to a user and a 409 has no documented cause: report the status
+  and GitHub's message, if there is one, as found-but-not-fixable beside
+  `https://$HOST/$OWNER/$REPO/settings/actions`, and do not explain it.
+  A field that still drifts on the post-apply re-read after a 204 is a
+  failed fix, not a cap: GitHub documents no such outcome, so report
+  what the re-read shows and do not explain it.
 
 - Branch rules need a repository ruleset — one of those Step 1 fetched.
   Merge the baseline into an existing ruleset only when all of these hold:
