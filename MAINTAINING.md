@@ -17,8 +17,9 @@ plugins/<plugin>/
   skills/<skill>/SKILL.md           one directory per skill
   commands/<command>.md             one file per slash command
   docs/<name>.md                    reference the plugin's skills cite and ship
-  scripts/                          scripts a command runs, and what they need
-    vendor/                         a library a script imports, with its
+  scripts/<name>.mjs                a script a command runs, with its tests
+    lib/                            the script's code, which the tests import
+    vendor/                         a library the script imports, with its
                                     license, byte for byte from upstream
 scripts/                            the checks, their tests, the local install
                                     helper, and probe-github-rendering.mjs
@@ -211,10 +212,15 @@ npm run ci
 
 Six checks, each runnable on its own:
 
-- `npm test` runs the tests for the check scripts themselves, with Node's
-  built-in test runner. The anchors the link check's tests expect are kept in
-  `scripts/check-links.cases.mjs`; when the check disagrees with GitHub about
-  a heading or an HTML anchor, add it there as a case.
+- `npm test` runs the tests for the check scripts themselves and for the
+  scripts the plugins ship, with Node's built-in test runner, and prints
+  the coverage table after them. The run fails when branch coverage across
+  every file falls below the `--test-coverage-branches` value in
+  `package.json`. That value sits just under where the code stands and
+  only ever moves up; raising it to 100 is issue #94. The anchors
+  the link check's tests expect are kept in `scripts/check-links.cases.mjs`;
+  when the check disagrees with GitHub about a heading or an HTML anchor,
+  add it there as a case.
 - `npm run lint:manifests` compares the marketplace manifest, the plugin
   manifests, and the skills on disk against each other, and fails when a skill
   is undeclared, a plugin is unlisted, a `SKILL.md` or a `plugin.json` has no
@@ -287,6 +293,20 @@ Drop the file in `plugins/<plugin>/commands/<name>.md`. Commands are
 discovered by directory and are not declared in the manifest. They report
 under Skills in `claude plugin details`, which is a display grouping and not
 an error.
+
+A command is prose, and prose can only be reviewed by argument. When a
+command grows a procedure with defined inputs and outputs — reading an API,
+comparing values, computing what to write — put that procedure in a script
+under `plugins/<plugin>/scripts/` with tests beside it, and have the command
+run it through `${CLAUDE_PLUGIN_ROOT}`, which Claude Code sets to the
+installed plugin's directory. The command keeps the parts that need
+judgment and tells an agent without the plugin where to clone the script
+from. A plugin script has no `npm install` on the machine that runs it, so
+it uses only what Node ships and what is vendored beside it, as
+[Vendoring a library](#vendoring-a-library) describes. The
+`check-repo-config` command's script is the model; its YAML parser is
+js-yaml vendored that way, and the coverage run in `npm test` excludes
+the vendor directory so the threshold measures this repository's code.
 
 ## Adding a plugin
 
