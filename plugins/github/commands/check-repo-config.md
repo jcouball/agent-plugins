@@ -1,5 +1,5 @@
 ---
-description: Audit the GitHub repository's branch protection, merge methods, settings, and agent guidance against the guardrails baseline, and optionally fix drift
+description: Audit the GitHub repository's branch protection, merge methods, settings, Actions token default, and agent guidance against the guardrails baseline, and optionally fix drift
 argument-hint: "[--fix]"
 ---
 
@@ -37,6 +37,9 @@ merge_methods:
 repository:
   delete_branch_on_merge: true
   allow_auto_merge: false
+actions:                 # the default GITHUB_TOKEN every workflow run gets
+  default_workflow_permissions: read
+  can_approve_pull_request_reviews: false
 branch_rules:            # rule types every protected branch must carry
   - pull_request
   - non_fast_forward
@@ -70,6 +73,8 @@ Where the file is missing or a key is absent, use these defaults:
 - `protected_branches`: `main`, `master`
 - `merge_methods`: rebase only
 - `repository`: `delete_branch_on_merge: true`, `allow_auto_merge: false`
+- `actions`: `default_workflow_permissions: read`,
+  `can_approve_pull_request_reviews: false`
 - `branch_rules`: `pull_request`, `non_fast_forward`, `deletion`,
   `required_linear_history`
 
@@ -81,22 +86,24 @@ Stop with a baseline error, and report nothing else, when the guardrails
 file has:
 
 - a key the schema does not define, at the top level or within
-  `merge_methods` or `repository`. A misspelled key is otherwise read as
-  absent and silently replaced by its default, so `allow_auto_merg: true`
-  would have the audit check — and `--fix` write — `allow_auto_merge:
-  false`, the opposite of the evident intent.
+  `merge_methods`, `repository`, or `actions`. A misspelled key is
+  otherwise read as absent and silently replaced by its default, so
+  `allow_auto_merg: true` would have the audit check — and `--fix`
+  write — `allow_auto_merge: false`, the opposite of the evident intent.
 - a mapping key that appears twice, at any level. YAML loaders disagree
   about duplicates — some reject them, others keep the first value or
   the last — so a file with two `rebase:` keys has the audit enforce
   whichever one the loader happened to keep, and `--fix` write a
   setting that matches at most half of what the file appears to say.
-- a value of the wrong shape. The file's root, `merge_methods`, and
-  `repository` must each be a mapping; the settings inside
-  `merge_methods` and `repository` take booleans; `protected_branches`
-  and `branch_rules` take lists of strings. A scalar or list where a
-  mapping belongs — a root that is a string, or `repository: true` — is
-  malformed, not "every key absent", and must stop the run rather than
-  quietly resolve to the defaults.
+- a value of the wrong shape. The file's root, `merge_methods`,
+  `repository`, and `actions` must each be a mapping; the settings inside
+  `merge_methods` and `repository` take booleans, and so does
+  `can_approve_pull_request_reviews`; `default_workflow_permissions`
+  takes `read` or `write`, the only two values the API accepts;
+  `protected_branches` and `branch_rules` take lists of strings. A
+  scalar or list where a mapping belongs — a root that is a string, or
+  `repository: true` — is malformed, not "every key absent", and must
+  stop the run rather than quietly resolve to the defaults.
 - an explicitly empty `protected_branches` list, or an empty pattern in
   it. An absent key is not an error: it resolves to its default like any
   other.
@@ -151,7 +158,25 @@ fi
 gh api --hostname "$HOST" "repos/$OWNER/$REPO" \
   --jq '{allow_merge_commit, allow_squash_merge,
   allow_rebase_merge, delete_branch_on_merge, allow_auto_merge}'
+gh api --hostname "$HOST" "repos/$OWNER/$REPO/actions/permissions/workflow"
 ```
+
+The second call reads the default `GITHUB_TOKEN` permissions and
+whether Actions may create and approve pull requests. Every workflow
+without a `permissions:` block runs with that token, and a repository
+created before 2023-02 kept a write default unless someone changed it,
+which is why the built-in baseline is `read`; the check itself compares
+the live value to whatever the baseline names. This read needs more
+than the read access the other Step 1 calls use: GitHub lists the
+endpoint under the repository Administration permission. A failed
+read — a 403, a 404, or anything else that returns no JSON — means the
+two fields cannot be seen from here: report the `actions` checks as
+partial, never as a pass, naming the endpoint, quoting the API's
+message, and pointing at `https://$HOST/$OWNER/$REPO/settings/actions`,
+where the values can be read by hand. A 403 names the access it wants;
+a 404 says only that the endpoint was not visible from here. A failure
+repeating on every run means the account lacks the permission, and an
+administrator must run or confirm these lines.
 
 With `GH_REPO` unset, `gh repo view` resolves from the checkout's Git
 remote through gh's own URL parser, which handles every remote form —
@@ -238,11 +263,17 @@ anything.
 ## Step 2: Compare and report
 
 Report a checklist, one line per checked setting, grouped as: repository
-settings, then each protected branch. Mark each line pass or drift, and for
-drift show expected vs actual. Checks:
+settings, the Actions token default, then each protected branch. Mark
+each line pass or drift, and for drift show expected vs actual. Checks:
 
 - Each merge method allowed on the repository matches `merge_methods`.
 - Each `repository` key matches.
+- Each `actions` key matches the workflow permissions read in Step 1. Say
+  in the report that this checks the default token only: a workflow that
+  declares its own `permissions:` block gets what it declares, and a
+  job-level block can still raise permissions above the default — a
+  release workflow asking for `contents: write` is normal. Auditing each
+  workflow's block is a lint concern and out of scope here.
 - Each protected branch carries every rule type in `branch_rules`.
 - Where `pull_request` rules apply to a branch, the intersection of their
   `allowed_merge_methods` permits no method `merge_methods` disables, and
@@ -400,6 +431,47 @@ before the first write:
   the fields that carry no merge-method risk —
   `delete_branch_on_merge` and `allow_auto_merge` — on their own.
 
+- The Actions token default. One idempotent `PUT` per field that
+  drifted, its value taken from the resolved baseline. The body accepts
+  either field alone, and one field per write is what lets a refusal
+  name the field it refused. Run only the command for a field that
+  drifted:
+
+  ```bash
+  gh api -X PUT "repos/$OWNER/$REPO/actions/permissions/workflow" \
+    -f default_workflow_permissions=<actions.default_workflow_permissions>
+  gh api -X PUT "repos/$OWNER/$REPO/actions/permissions/workflow" \
+    -F can_approve_pull_request_reviews=<actions.can_approve_pull_request_reviews>
+  ```
+
+  They touch no ruleset and no merge method, so they carry no
+  intermediate-state risk and go with the settings that fix on their
+  own. They do depend on Step 1's read of the same endpoint: while that
+  read failed, the drift is unknown, and the re-read that would confirm
+  a write fails the same way. Hold both writes and report both fields
+  as blocked on reading the endpoint, as ruleset writes are held while
+  a parent is unreadable.
+
+  An organization caps each of the two fields on its own — a repository
+  may not grant the token more than the organization allows, and may not
+  let Actions approve pull requests when the organization forbids it —
+  and neither cap is visible in the repository read. Only a baseline
+  asking for `write` or `true` can meet a cap, since an organization
+  restricts and never loosens; with the built-in defaults nothing in
+  this paragraph applies. The `PUT` answers 409 when the owning
+  organization prevents the change, and with one field per write the
+  409 names the capped field by itself. Report that field on its own
+  line, as Step 2 lists them, as found-but-not-fixable — not a pass,
+  and not a failed fix — and name where it is changed: the owning
+  organization's Actions settings,
+  `https://$HOST/organizations/$OWNER/settings/actions`, or its
+  enterprise's where the organization inherits the value, the same way
+  an inherited ruleset is reported as the organization's to edit. A 409
+  comes only from an organization-owned repository, so `$OWNER` there
+  is the organization. A field that still drifts on the post-apply
+  re-read after a 204 is a failed fix, not a cap: GitHub documents no
+  such outcome, so report what the re-read shows and do not explain it.
+
 - Branch rules need a repository ruleset — one of those Step 1 fetched.
   Merge the baseline into an existing ruleset only when all of these hold:
   its `source_type` is `Repository` — Step 1's listing includes inherited
@@ -542,11 +614,13 @@ before the first write:
   a default-branch rename, and the ruleset would then enforce a branch
   neither the baseline nor the agent guidance names.
 
-- The settings `PATCH` and the ruleset writes all need admin. When any of
-  them returns 403 or 404, report that drift as found-but-not-fixable,
-  name the settings page — `https://$HOST/$OWNER/$REPO/settings` for
-  the `PATCH`, `https://$HOST/$OWNER/$REPO/settings/rules` for a
-  ruleset — and continue with the writes that remain. One refused write
+- The settings `PATCH`, the Actions `PUT`, and the ruleset writes all
+  need admin. When any of them returns 403 or 404, report that drift as
+  found-but-not-fixable, name the settings page —
+  `https://$HOST/$OWNER/$REPO/settings` for the `PATCH`,
+  `https://$HOST/$OWNER/$REPO/settings/actions` for the `PUT`,
+  `https://$HOST/$OWNER/$REPO/settings/rules` for a ruleset — and
+  continue with the writes that remain. One refused write
   does not abort the run: the settings `PATCH` failing says nothing about
   whether the ruleset write would, and the report should show every fix
   that landed alongside every one that needs the browser. The exception
@@ -569,24 +643,23 @@ half-transitioned, its settings already widened for a ruleset change
 that never happens. Confirmation can take arbitrarily long, and a `PUT`
 payload built from the earlier GET replaces every writable field — so
 after confirmation and before executing, re-run the Step 1 reads in
-full — the repository settings, the ruleset listing with parents
-included, and re-run the Step 4 discovery and classification over the
-plan's local inputs too: the baseline file and every instruction source
-the classification read, not only the guidance targets the plan would
-write, whose ownership hashes were computed against pre-confirmation
-text — an import, a nested instruction file, or a file created during
-the wait can reclassify a chain while every planned target sits
-untouched. Compare all of it
-against the state the plan was built from. Re-fetching only the objects
-the plan touches is not enough: a ruleset another administrator created
-or changed during the wait can invalidate the compatibility calculation
-while every touched object reads back unchanged. If anything differs,
-another administrator was here: rebuild the plan from the fresh
-state — the
+full — the repository settings, the Actions token default, the ruleset
+listing with parents included, and re-run the Step 4 discovery and
+classification over the plan's local inputs too: the baseline file and
+every instruction source the classification read, not only the guidance
+targets the plan would write, whose ownership hashes were computed
+against pre-confirmation text — an import, a nested instruction file,
+or a file created during the wait can reclassify a chain while every
+planned target sits untouched. Compare all of it against the state the
+plan was built from. Re-fetching only the objects the plan touches is
+not enough: a ruleset another administrator created or changed during
+the wait can invalidate the compatibility calculation while every
+touched object reads back unchanged. If anything differs, another
+administrator was here: rebuild the plan from the fresh state — the
 merge-method safety calculation included — and confirm again rather
-than silently overwriting their change. After
-applying, re-run the read commands and report the
-checklist again so the fix is verified, not assumed.
+than silently overwriting their change. After applying, re-run the read
+commands and report the checklist again so the fix is verified, not
+assumed.
 
 ## Step 4: Agent guidance
 
