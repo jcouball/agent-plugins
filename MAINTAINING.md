@@ -17,6 +17,9 @@ plugins/<plugin>/
   skills/<skill>/SKILL.md           one directory per skill
   commands/<command>.md             one file per slash command
   docs/<name>.md                    reference the plugin's skills cite and ship
+  scripts/                          scripts a command runs, and what they need
+    vendor/                         a library a script imports, with its
+                                    license, byte for byte from upstream
 scripts/                            the checks, their tests, the local install
                                     helper, and probe-github-rendering.mjs
   lib/                              the checks' code, which the tests import
@@ -345,6 +348,35 @@ worth taking, update `NOTICE.md`, and commit as `feat` or `fix` — never
 `chore`, which would strand installs on the old commit.
 [Its command file](plugins/marketplace/commands/update-vendored-skill.md)
 is the canonical copy of the steps.
+
+## Vendoring a library
+
+A plugin script runs from the installed plugin's directory, where nothing
+has run `npm install`, so a library it needs travels with the plugin under
+`plugins/<plugin>/scripts/vendor/`. A library is never modified locally:
+the file is the upstream build byte for byte, and the upstream `LICENSE`
+sits beside it as `<library>.LICENSE`, because the plugin directory is
+what an install copies and the root `NOTICE.md` is not in it. Source maps
+are left out on purpose, so a stack trace from a vendored library shows
+positions in the build. `NOTICE.md` records the package and version, the
+tarball and the sha512 integrity string npm verifies it by, the path of
+each file inside it and each file's own sha256 so the copies can be
+checked without a download, and the upstream commit the release was built
+from.
+
+An update is a replacement, not a port: take the file and `LICENSE` from
+the new tarball, update the `NOTICE.md` entry, and commit the two together,
+scoped to the plugin, typed as a vendored skill update is: `fix` when no
+behavior a script exposes changes, `feat` or a breaking marker when one
+does, because the copy ships to every install and the release should say
+what changed. Only the first landing of a library, before any script reads
+it, changes no behavior, and that commit can be a `chore`; the current
+release-please configs still list a `chore` in the changelog under Other
+Changes, which issue #97 is about. In `.gitattributes` the directory is
+`linguist-generated`, which hides it in pull request diffs, and
+`linguist-vendored`, which keeps it out of the language statistics; a
+license file beside it is exempt from the first, so a bump that changes it
+is seen.
 
 ## Command line gotchas
 
