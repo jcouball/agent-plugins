@@ -1,0 +1,6 @@
+# A vendored library is upstream code, not authored here. linguist-generated
+# hides it in pull request diffs; linguist-vendored keeps it out of the
+# language statistics. The license beside it stays visible, so a bump that
+# changes it is seen.
+plugins/*/scripts/vendor/** linguist-vendored linguist-generated
+plugins/*/scripts/vendor/*LICENSE* -linguist-generated
