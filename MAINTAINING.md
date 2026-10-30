@@ -356,16 +356,16 @@ The upstream `LICENSE` travels with the skill, byte for byte, as
 `plugins/<plugin>/skills/<name>/LICENSE`, because an install copies the
 plugin directory and nothing else, as
 [Vendoring a library](#vendoring-a-library) explains. `NOTICE.md` records
-the path of the license inside the upstream repository and its sha256, so
-the copy can be checked without a download.
+the path of the license inside the upstream repository, so the copy can be
+compared with its source.
 
 The two commits are the point, not a formality:
 `git diff <vendor-commit> <modify-commit>` answers what was changed locally.
 A prose file recording the same thing drifts the first time someone edits
 the skill and forgets to update it — which is why `NOTICE.md` records only
-the source repository, path, upstream commit, license path and sha256,
-license name, and copyright line, and describes the local changes not at
-all. The git history is the record of those.
+the source repository, path, upstream commit, license path, license name,
+and copyright line, and describes the local changes not at all. The git
+history is the record of those.
 
 ### Updating a vendored skill
 
@@ -391,9 +391,7 @@ what an install copies and the root `NOTICE.md` is not in it. Source maps
 are left out on purpose, so a stack trace from a vendored library shows
 positions in the build. `NOTICE.md` records the package and version, the
 tarball and the sha512 integrity string npm verifies it by, the path of
-each file inside it and each file's own sha256 so the copies can be
-checked without a download, and the upstream commit the release was built
-from.
+each file inside it, and the upstream commit the release was built from.
 
 An update is a replacement, not a port: take the file and `LICENSE` from
 the new tarball, update the `NOTICE.md` entry, and commit the two together,

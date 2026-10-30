@@ -26,11 +26,28 @@ reviewed; read it first.
    auto-applies hunks in regions with no local changes and leaves conflict
    markers where they collide.
 4. Update the commit recorded in `NOTICE.md`. Fetch the upstream license
-   at the new head the same way, from the `license path` recorded there;
-   if its sha256 differs from `license sha256`, replace the `LICENSE`
-   beside the skill with it, byte for byte, and update the sha256, license
-   name, and copyright line, and stop if the new terms no longer permit
-   redistribution with attribution.
+   at the recorded commit and at the new head, from the `license path`
+   recorded there, and compare both with the `LICENSE` beside the skill:
+
+   ```bash
+   dir=$(mktemp -d)
+   gh api 'repos/<owner>/<repo>/contents/<license path>?ref=<old sha>' --jq .content | base64 -d > "$dir/old"
+   gh api 'repos/<owner>/<repo>/contents/<license path>?ref=<new sha>' --jq .content | base64 -d > "$dir/new"
+   cmp "$dir/new" plugins/<plugin>/skills/<name>/LICENSE
+   cmp "$dir/old" "$dir/new"
+   ```
+
+   Stop if either fetch prints an error or leaves an empty file: a failed
+   fetch is not a difference. The two comparisons answer separate
+   questions. The second, old against new, says whether upstream changed
+   the license: if it reports a difference, update the license name and
+   copyright line, and stop if the new terms no longer permit
+   redistribution with attribution. The first, new against local, says
+   whether the file needs replacing: if it reports a difference, replace
+   the file with `$dir/new`, byte for byte. When only the first reports a
+   difference, the local file drifted and upstream did not change the
+   license, so restore it and leave the license name and copyright line
+   alone.
 5. Run `npm run ci`.
 6. Commit once, scoped to the plugin, naming the upstream range in the
    body. Use `feat` or `fix`, not `chore`: a `chore` never triggers a

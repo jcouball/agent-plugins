@@ -34,14 +34,12 @@ Land it in two commits, always.
 
    In the same commit, record the source repository, path, and commit in
    `NOTICE.md`, along with the license name, the copyright line from the
-   `LICENSE`, the path of the `LICENSE` inside the upstream repository
-   under `license path`, and its sha256 from `shasum -a 256` under
-   `license sha256`, in the shape of the existing sections, so the record
-   reads by key. The license text itself is not repeated there; the copy
-   beside the skill is the one copy of it. Record nothing about local
-   changes there — the git history is the record of those. `npm run ci`
-   may fail at this point (undeclared skill, upstream formatting); that is
-   expected until the second commit.
+   `LICENSE`, and the path of the `LICENSE` inside the upstream repository
+   under `license path`, in the shape of the existing sections. The license
+   text itself is not repeated there; the copy beside the skill is the one
+   copy of it. Record nothing about local changes there — the git history
+   is the record of those. `npm run ci` may fail at this point (undeclared
+   skill, upstream formatting); that is expected until the second commit.
 3. Second commit: every local modification, with the reasoning in the commit
    body. This is where the skill joins the marketplace: declare it in the
    plugin manifest, give the description trigger words, and add the
