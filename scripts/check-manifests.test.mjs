@@ -155,3 +155,167 @@ test('reports descriptions that are not strings even when they match', () => {
     `${manifestPath} has a description that is not a string`,
   ])
 })
+
+const manifestPath = 'plugins/demo/.claude-plugin/plugin.json'
+const pluginJson = (fields) =>
+  JSON.stringify({ name: 'jcouball-demo', version: '0.1.0', description, skills: ['./skills/do-thing'], ...fields })
+
+test('reports a file that is not valid JSON', () => {
+  const errors = run(tree({ '.claude-plugin/marketplace.json': '{' }))
+  assert.match(errors[0], /^\.claude-plugin\/marketplace\.json is not valid JSON: /)
+})
+
+test('reports missing files', () => {
+  const files = tree()
+  delete files['.claude-plugin/marketplace.json']
+  delete files['.release-please/demo-config.json']
+  delete files['.release-please/demo-manifest.json']
+  assert.deepEqual(run(files), [
+    'missing file: .claude-plugin/marketplace.json',
+    'jcouball-demo is not listed in the marketplace manifest',
+    'missing file: .release-please/demo-config.json',
+    'missing file: .release-please/demo-manifest.json',
+  ])
+})
+
+test('reports a tree with no plugins', () => {
+  assert.deepEqual(run({ '.claude-plugin/marketplace.json': JSON.stringify({ plugins: [] }) }), [
+    'no plugins found under plugins/',
+  ])
+})
+
+test('reports a marketplace plugins key that is not an array', () => {
+  const errors = run(tree({ '.claude-plugin/marketplace.json': JSON.stringify({ plugins: {} }) }))
+  assert.equal(errors[0], '.claude-plugin/marketplace.json has a plugins key that is not an array')
+})
+
+test('reports a marketplace entry whose name or source is not a string', () => {
+  const entries = [{ source: './plugins/demo' }, { name: 'jcouball-demo', source: 7 }]
+  assert.deepEqual(run(tree({ '.claude-plugin/marketplace.json': JSON.stringify({ plugins: entries }) })).slice(0, 2), [
+    'marketplace plugin at index 0 has no name, or its name is not a string',
+    'marketplace lists jcouball-demo with a source that is not a string',
+  ])
+})
+
+test('reports a plugin listed twice', () => {
+  const entry = { name: 'jcouball-demo', source: './plugins/demo', description }
+  const errors = run(tree({ '.claude-plugin/marketplace.json': JSON.stringify({ plugins: [entry, entry] }) }))
+  assert.deepEqual(errors, ['marketplace lists jcouball-demo more than once'])
+})
+
+test('reports a marketplace source that does not exist or points at the wrong directory', () => {
+  const entry = { name: 'jcouball-demo', source: './plugins/gone', description }
+  const errors = run(tree({ '.claude-plugin/marketplace.json': JSON.stringify({ plugins: [entry] }) }))
+  assert.deepEqual(errors, [
+    'marketplace lists jcouball-demo with a source that does not exist: ./plugins/gone',
+    'marketplace source for jcouball-demo is ./plugins/gone, expected ./plugins/demo',
+  ])
+})
+
+test('reports a marketplace entry with no description against a plugin.json that has one', () => {
+  const entry = { name: 'jcouball-demo', source: './plugins/demo' }
+  const errors = run(tree({ '.claude-plugin/marketplace.json': JSON.stringify({ plugins: [entry] }) }))
+  assert.equal(errors.length, 1)
+  assert.match(errors[0], /^description mismatch for jcouball-demo at character 0:/)
+})
+
+test('reports a plugin.json with no name, and skips the rest of its checks', () => {
+  const errors = run(tree({ [manifestPath]: JSON.stringify({ version: '0.1.0' }) }))
+  assert.deepEqual(errors, [
+    `${manifestPath} has no name`,
+    'marketplace lists jcouball-demo, but no plugin under plugins/ declares that name',
+  ])
+})
+
+test('reports a plugin.json with no version', () => {
+  const errors = run(tree({ [manifestPath]: pluginJson({ version: undefined }) }))
+  assert.equal(errors[0], `${manifestPath} has no version`)
+})
+
+test('reports a plugin missing from the marketplace', () => {
+  const marketplace = JSON.stringify({ plugins: [{ name: 'other', source: './plugins/demo', description }] })
+  assert.deepEqual(run(tree({ '.claude-plugin/marketplace.json': marketplace })), [
+    'jcouball-demo is not listed in the marketplace manifest',
+    'marketplace lists other, but no plugin under plugins/ declares that name',
+  ])
+})
+
+test('reports a release-please config that does not declare the plugin, or declares others', () => {
+  const config = (packages) => ({ '.release-please/demo-config.json': JSON.stringify(packages) })
+  assert.deepEqual(run(tree(config({}))), [
+    '.release-please/demo-config.json does not declare plugins/demo under packages',
+  ])
+  assert.deepEqual(run(tree(config({ packages: { 'plugins/demo': {}, 'plugins/other': {} } }))), [
+    '.release-please/demo-config.json declares packages beyond plugins/demo: plugins/other',
+  ])
+})
+
+test('reports a plugin the release-please manifest does not track, or tracks at another version', () => {
+  const versions = (content) => ({ '.release-please/demo-manifest.json': JSON.stringify(content) })
+  assert.deepEqual(run(tree(versions({}))), ['plugins/demo is not tracked in .release-please/demo-manifest.json'])
+  assert.deepEqual(run(tree(versions({ 'plugins/demo': '0.2.0' }))), [
+    'version mismatch for jcouball-demo: plugin.json says 0.1.0, .release-please/demo-manifest.json says 0.2.0',
+  ])
+})
+
+test('reports a skills key that is not an array, and a skill entry that is not a string', () => {
+  assert.deepEqual(run(tree({ [manifestPath]: pluginJson({ skills: 'x' }) })), [
+    `${manifestPath} has a skills key that is not an array`,
+    `skill on disk but not declared in ${manifestPath}: ./skills/do-thing`,
+  ])
+  assert.deepEqual(run(tree({ [manifestPath]: pluginJson({ skills: ['./skills/do-thing', 3] }) })), [
+    `${manifestPath} declares a skill that is not a string: 3`,
+  ])
+})
+
+test('accepts a plugin that declares no skills and has none on disk', () => {
+  const files = tree({ [manifestPath]: pluginJson({ skills: undefined }) })
+  delete files[skillFile]
+  assert.deepEqual(run(files), [])
+})
+
+test('reports a declared skill with no SKILL.md, and a skill directory with none', () => {
+  const files = tree({ [manifestPath]: pluginJson({ skills: ['./skills/do-thing', './skills/gone'] }) })
+  files['plugins/demo/skills/empty/README.md'] = ''
+  assert.deepEqual(run(files), [
+    'declared skill has no SKILL.md: plugins/demo/skills/gone/SKILL.md',
+    'skill directory has no SKILL.md: plugins/demo/skills/empty',
+  ])
+})
+
+test('reports a skill on disk that plugin.json does not declare', () => {
+  const errors = run(tree({ [manifestPath]: pluginJson({ skills: [] }) }))
+  assert.deepEqual(errors, [`skill on disk but not declared in ${manifestPath}: ./skills/do-thing`])
+})
+
+test('reports front matter that is never closed as no front matter', () => {
+  assert.deepEqual(run(tree({ [skillFile]: '---\nname: do-thing\n' })), [`${skillFile} has no frontmatter block`])
+})
+
+test('reports front matter that parses to nothing or to a scalar as missing its fields', () => {
+  for (const body of ['', 'just text']) {
+    assert.deepEqual(run(tree({ [skillFile]: skill(body) })), [
+      `${skillFile} frontmatter has no name`,
+      `${skillFile} frontmatter has no description`,
+    ])
+  }
+})
+
+test('reports a skill with an empty name', () => {
+  const errors = run(tree({ [skillFile]: skill('name: ""\ndescription: Use when') }))
+  assert.deepEqual(errors, [`${skillFile} frontmatter has no name`])
+})
+
+test('reports a command file that is not markdown, and ignores dotfiles', () => {
+  const errors = run(tree({ 'plugins/demo/commands/run.txt': '', 'plugins/demo/commands/.DS_Store': '', 'plugins/demo/commands/ok.md': '' }))
+  assert.deepEqual(errors, ['command file is not markdown: plugins/demo/commands/run.txt'])
+})
+
+test('reports a plugin.json that is missing, and skips the rest of its checks', () => {
+  const files = tree()
+  delete files[manifestPath]
+  assert.deepEqual(run(files), [
+    `missing file: ${manifestPath}`,
+    'marketplace lists jcouball-demo, but no plugin under plugins/ declares that name',
+  ])
+})
