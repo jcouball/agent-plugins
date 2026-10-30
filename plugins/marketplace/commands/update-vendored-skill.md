@@ -25,7 +25,12 @@ reviewed; read it first.
    repository's formatting as you go. `git merge-file <local> <old> <new>`
    auto-applies hunks in regions with no local changes and leaves conflict
    markers where they collide.
-4. Update the commit recorded in `NOTICE.md`.
+4. Update the commit recorded in `NOTICE.md`. Fetch the upstream license
+   at the new head the same way, from the `license path` recorded there;
+   if its sha256 differs from `license sha256`, replace the `LICENSE`
+   beside the skill with it, byte for byte, and update the sha256, license
+   name, and copyright line, and stop if the new terms no longer permit
+   redistribution with attribution.
 5. Run `npm run ci`.
 6. Commit once, scoped to the plugin, naming the upstream range in the
    body. Use `feat` or `fix`, not `chore`: a `chore` never triggers a
