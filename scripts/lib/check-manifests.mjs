@@ -143,7 +143,7 @@ export function checkManifests(root) {
         (entry.description === undefined || typeof entry.description === 'string')
       if (comparable && entry.description !== manifest.description) {
         const a = entry.description ?? ''
-        const b = manifest.description ?? ''
+        const b = manifest.description
         let at = 0
         while (at < a.length && at < b.length && a[at] === b[at]) at += 1
         fail(
