@@ -50,7 +50,8 @@ reviewed; read it first.
    alone.
 5. Run `npm run ci`.
 6. Commit once, scoped to the plugin, naming the upstream range in the
-   body. Use `feat` or `fix`, not `chore`: a `chore` never triggers a
-   release, and content on `main` without a version bump leaves installs
-   pinned to the old commit (see the `npm run sync` gotcha in
-   MAINTAINING.md).
+   body. Use `feat` or `fix`, not `chore`: every type the release-please
+   configs list is releasable, but the changelog should tell an installer
+   that the skill changed, and a `chore` entry under Other Changes does not
+   say that. Use `fix` when the port corrects wording or an existing rule,
+   and `feat` when it adds or changes what the skill tells an agent to do.

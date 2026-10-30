@@ -375,8 +375,10 @@ sections, local fixes — so an upstream update is ported by hand, not merged.
 `/jcouball-marketplace:update-vendored-skill` walks the port: fetch both
 upstream versions, diff them so local changes never appear, take the hunks
 worth taking, update `NOTICE.md` and, if upstream changed its license, the
-`LICENSE` beside the skill, and commit as `feat` or `fix` — never `chore`,
-which would strand installs on the old commit.
+`LICENSE` beside the skill, and commit as `feat` or `fix`, so the changelog
+tells an installer that the skill changed. Every commit type the
+release-please configs list is releasable, `chore` included, so the type
+decides how the release notes read, not whether a release happens.
 [Its command file](plugins/marketplace/commands/update-vendored-skill.md)
 is the canonical copy of the steps.
 
@@ -399,9 +401,9 @@ scoped to the plugin, typed as a vendored skill update is: `fix` when no
 behavior a script exposes changes, `feat` or a breaking marker when one
 does, because the copy ships to every install and the release should say
 what changed. Only the first landing of a library, before any script reads
-it, changes no behavior, and that commit can be a `chore`; the current
-release-please configs still list a `chore` in the changelog under Other
-Changes, which issue #97 is about. In `.gitattributes` the directory is
+it, changes no behavior, and that commit can be a `chore`, which the
+configs list in the changelog under Other Changes and release like any
+other type. In `.gitattributes` the directory is
 `linguist-generated`, which hides it in pull request diffs, and
 `linguist-vendored`, which keeps it out of the language statistics; a
 license file beside it is exempt from the first, so a bump that changes it
