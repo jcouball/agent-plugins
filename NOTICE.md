@@ -19,7 +19,6 @@ Copyright (c) 2026 Lauren Tan. pstack's `LICENSE` sits beside the skill as
     path:           pstack/skills/unslop/SKILL.md
     commit:         bc697d0a5a163cec979e362b601e36f5616083fd
     license path:   pstack/LICENSE
-    license sha256: bc957ca6bee02792566a1a028d105e02e247c6e77cf057061674273da77b200e
 
 ## plugins/github/scripts/vendor/js-yaml.mjs
 
@@ -33,8 +32,6 @@ sits beside the file as `js-yaml.LICENSE`.
     tarball:        https://registry.npmjs.org/js-yaml/-/js-yaml-5.5.0.tgz
     integrity:      sha512-paNr4LFIFPjeeSmwNYdrb8FafLLG/Cr2Af3GjbsHJ5CxIjH4r0c2emlmRdAtpPAieP1gRVzk6buBbVP5gBMGAg==
     tarball path:   package/dist/js-yaml.mjs
-    file sha256:    213470960d9c2ff1d01f9164e5017749bfc383d8a6ebb8683f35c76e8c6d052b
     license path:   package/LICENSE
-    license sha256: a07bc24468b9654ce76a547d47a2db282d07733b715db4c73a98bd63961f9550
     source repo:    https://github.com/nodeca/js-yaml
     source commit:  cb62b2dbbaa0b3e7379d83a5d69d8d52d21b6efb
