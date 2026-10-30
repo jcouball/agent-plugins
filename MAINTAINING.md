@@ -403,11 +403,30 @@ does, because the copy ships to every install and the release should say
 what changed. Only the first landing of a library, before any script reads
 it, changes no behavior, and that commit can be a `chore`, which the
 configs list in the changelog under Other Changes and release like any
-other type. In `.gitattributes` the directory is
-`linguist-generated`, which hides it in pull request diffs, and
-`linguist-vendored`, which keeps it out of the language statistics; a
-license file beside it is exempt from the first, so a bump that changes it
-is seen.
+other type.
+
+Take the tarball into an empty directory and check its sha512 against the
+integrity string npm reports before copying anything from it; that string
+goes into the `NOTICE.md` entry. After replacing the files from the
+tarball, both `cmp` calls must be silent. To audit a copy already in the
+tree, run the same steps against the version and integrity string recorded
+in `NOTICE.md`; again both `cmp` calls must be silent. Run them from the
+repository root:
+
+```bash
+dir=$(mktemp -d)
+npm pack <package>@<version> --pack-destination "$dir"
+npm view <package>@<version> dist.integrity
+echo "sha512-$(openssl dgst -sha512 -binary "$dir/<tarball>.tgz" | base64 | tr -d '\n')"
+tar -xzf "$dir/<tarball>.tgz" -C "$dir"
+cmp "$dir/<tarball path>" plugins/<plugin>/scripts/vendor/<file>
+cmp "$dir/package/LICENSE" plugins/<plugin>/scripts/vendor/<library>.LICENSE
+```
+
+In `.gitattributes` the directory is `linguist-generated`, which hides it
+in pull request diffs, and `linguist-vendored`, which keeps it out of the
+language statistics; a license file beside it is exempt from the first, so
+a bump that changes it is seen.
 
 ## Command line gotchas
 
