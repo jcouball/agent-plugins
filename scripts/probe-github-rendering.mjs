@@ -3,7 +3,8 @@
 // Check what the link check assumes about GitHub's rendering against GitHub
 // itself: the anchors each case in check-links.cases.mjs expects, the HTML
 // elements whose id survives GitHub's sanitizer, and the link schemes it
-// keeps. Prints each disagreement and exits 1 if there is one.
+// keeps. Prints each disagreement and exits 1 if there is one. Exits 2 when gh
+// cannot render, since that says nothing about whether GitHub agrees.
 //
 // Run it by hand when the link check disagrees with GitHub about a link. It
 // calls GitHub's API through an authenticated gh, so CI does not run it.
@@ -100,7 +101,14 @@ const schemes = (
 const schemeMarkdown = schemes.map((scheme) => `[${scheme}](${scheme}:x)`).join('\n\n')
 
 const cases = [...headingCases, ...anchorCases]
-const [elementHtml, schemeHtml, ...caseHtml] = await renderAll([elementMarkdown, schemeMarkdown, ...cases.map(([, markdown]) => markdown)])
+let rendered
+try {
+  rendered = await renderAll([elementMarkdown, schemeMarkdown, ...cases.map(([, markdown]) => markdown)])
+} catch (error) {
+  console.error(`probe failed: ${error.stderr?.trim() || error.message}`)
+  process.exit(2)
+}
+const [elementHtml, schemeHtml, ...caseHtml] = rendered
 
 const problems = []
 
