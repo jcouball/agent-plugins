@@ -112,9 +112,10 @@ installing this one.
 
 ## Attribution
 
-`unslop` is derived from poteto's pstack plugin and used under the MIT
-license. See [NOTICE.md](NOTICE.md) for the full attribution and the upstream
-commit it was taken from.
+`unslop` is derived from poteto's pstack plugin. See
+[its LICENSE](plugins/writing/skills/unslop/LICENSE), the notice that ships
+with the skill, for the terms, and [NOTICE.md](NOTICE.md) for the
+attribution and the upstream commit it was taken from.
 
 ## License
 
