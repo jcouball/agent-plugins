@@ -24,6 +24,9 @@ const run = promisify(execFile)
 
 const render = async (text) => {
   const child = run('gh', ['api', 'markdown', '--input', '-'], { maxBuffer: 16 * 1024 * 1024 })
+  // A gh that exits without reading its input closes the pipe, and writing to
+  // it is an EPIPE on stdin. The failed exit, awaited below, is what to report.
+  child.child.stdin.on('error', () => {})
   child.child.stdin.end(JSON.stringify({ text: text.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n/, ''), mode: 'markdown' }))
   return (await child).stdout
 }
