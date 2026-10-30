@@ -15,6 +15,8 @@ any agent working in this repository.
 plugins/<plugin>/
   .claude-plugin/plugin.json        the plugin manifest, declares its skills
   skills/<skill>/SKILL.md           one directory per skill
+  skills/<skill>/LICENSE            the upstream license of a vendored skill,
+                                    byte for byte
   commands/<command>.md             one file per slash command
   docs/<name>.md                    reference the plugin's skills cite and ship
   scripts/<name>.mjs                a script a command runs, with its tests
@@ -343,19 +345,27 @@ Delete those directories by hand if they accumulate.
 
 ## Vendoring a third-party skill
 
-Land it in two commits, always: first the upstream file byte for byte, then
-every local modification with the reasoning in the commit body.
+Land it in two commits, always: first the upstream skill and its `LICENSE`
+byte for byte, then every local modification with the reasoning in the
+commit body.
 `/jcouball-marketplace:vendor-skill` walks the procedure, license check
 included; [its command file](plugins/marketplace/commands/vendor-skill.md)
 is the canonical copy of the steps.
+
+The upstream `LICENSE` travels with the skill, byte for byte, as
+`plugins/<plugin>/skills/<name>/LICENSE`, because an install copies the
+plugin directory and nothing else, as
+[Vendoring a library](#vendoring-a-library) explains. `NOTICE.md` records
+the path of the license inside the upstream repository and its sha256, so
+the copy can be checked without a download.
 
 The two commits are the point, not a formality:
 `git diff <vendor-commit> <modify-commit>` answers what was changed locally.
 A prose file recording the same thing drifts the first time someone edits
 the skill and forgets to update it — which is why `NOTICE.md` records only
-the source repository, path, upstream commit, and license notice, and
-describes the local changes not at all. The git history is the record of
-those.
+the source repository, path, upstream commit, license path and sha256,
+license name, and copyright line, and describes the local changes not at
+all. The git history is the record of those.
 
 ### Updating a vendored skill
 
@@ -364,8 +374,9 @@ sections, local fixes — so an upstream update is ported by hand, not merged.
 `NOTICE.md` records the upstream commit last reviewed.
 `/jcouball-marketplace:update-vendored-skill` walks the port: fetch both
 upstream versions, diff them so local changes never appear, take the hunks
-worth taking, update `NOTICE.md`, and commit as `feat` or `fix` — never
-`chore`, which would strand installs on the old commit.
+worth taking, update `NOTICE.md` and, if upstream changed its license, the
+`LICENSE` beside the skill, and commit as `feat` or `fix` — never `chore`,
+which would strand installs on the old commit.
 [Its command file](plugins/marketplace/commands/update-vendored-skill.md)
 is the canonical copy of the steps.
 
