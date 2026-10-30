@@ -130,6 +130,15 @@ describe('checkLinks', () => {
     assert.deepEqual(result.broken, ['a.md: docs/#nope (no such heading)', 'a.md: empty/#x (no README to hold the heading)'])
   })
 
+  test('skips a link with an empty destination', () => {
+    assert.deepEqual(run({ 'a.md': '[x]()' }), { broken: [], checked: 0 })
+  })
+
+  test('looks past a .github that is a file when taking the root README', () => {
+    const result = run({ 'a.md': '[x](/#top) [y](/#heading)', '.github': '', 'README.md': '# Heading' })
+    assert.deepEqual(result.broken, [])
+  })
+
   test('prefers README.md over a translated README beside it', () => {
     const result = run({ 'a.md': '[e](e/#english)', 'e/README.ja.md': '# Japanese', 'e/README.md': '# English' })
     assert.deepEqual(result.broken, [])
