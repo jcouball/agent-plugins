@@ -173,6 +173,7 @@ export const anchorCases = [
     lines('<!--', '# In a comment', '-->', '', 'Text <!-- <a id="hidden"></a> --> here'),
     [],
   ],
+  ['leaves an HTML comment out of the heading text it slugs', lines('# Title <!-- note -->'), ['title-']],
   [
     'finds headings inside block quotes and opening list items',
     lines('> ## Quoted', '> > ### Nested', '- ## Listed', '1. ## Numbered'),
