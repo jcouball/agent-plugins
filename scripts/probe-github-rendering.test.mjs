@@ -78,7 +78,7 @@ test('probe-github-rendering reports a scheme GitHub removes that keptSchemes ha
 
 test('probe-github-rendering exits 2 with gh\'s error when gh fails', () => {
   const result = probe({}, { gh: 'echo "gh: not logged in" >&2\nexit 1' })
-  assert.equal(result.status, 2)
+  assert.equal(result.status, 2, result.stderr)
   assert.equal(result.stderr, 'probe failed: gh: not logged in\n')
 })
 
