@@ -137,6 +137,8 @@ const result = spawnSync(actionlint, args, { cwd: root, stdio: 'inherit' })
 
 const pythonWentUnchecked = marker !== null && existsSync(marker)
 
+// A binary that vanished between the version check and here never ran, which
+// leaves status null and, without this, exits 0 below.
 if (result.error) fail(result.error.message)
 
 if (!onPath('shellcheck')) {
