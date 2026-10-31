@@ -395,3 +395,22 @@ test('guidance write refuses a block that was edited, or whose markers are malfo
   assert.equal(malformed.status, 4);
   assert.match(malformed.json.refused, /the markers are malformed \(2 begin markers and 2 end markers\)/);
 });
+
+// ---------------------------------------------------------------------------
+// Output larger than a pipe holds
+
+test('a document larger than the pipe buffer reaches the reader whole when the script exits non-zero', () => {
+  const dir = repository();
+  const patterns = Array.from({ length: 100 }, (_, i) => `topic-${i}`);
+  write(dir, '.claude/repo-guardrails.yml', `protected_branches: [${patterns.join(', ')}]\n`);
+  track(dir, '.claude/repo-guardrails.yml');
+  const routes = compliantRoutes([], ['main']);
+  const planFile = path.join(dir, 'plan.json');
+  assert.equal(runGh(dir, routes, ['audit', '--plan-out', planFile]).status, 0);
+  routes['GET repos/acme/widgets'] = { ...routes['GET repos/acme/widgets'], allow_squash_merge: true };
+  const result = runGh(dir, routes, ['apply', planFile]);
+  assert.equal(result.status, 3);
+  assert.ok(result.stdout.length > 64 * 1024, `the document is only ${result.stdout.length} bytes`);
+  assert.equal(result.json.status, 'stale');
+  assert.ok(result.json.audit.checks.length > 100);
+});
