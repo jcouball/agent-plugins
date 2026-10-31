@@ -257,10 +257,10 @@ Six checks, each runnable on its own:
 
 CI runs the same checks in two jobs, `Lint and Validate` and
 `Verify Conventional Commits`. A third job, `Script tests on macOS`, runs
-`npm test` alone on macOS. A pipe write is asynchronous there, so a script that
-exits right after printing can lose output still queued, which does not happen
-on Linux and so cannot fail a test on `ubuntu-latest`. The branch ruleset does
-not require that job yet.
+`npm run test:run` on macOS, which is `npm test` without the coverage gate. A pipe
+write is asynchronous there, so a script that exits right after printing can lose
+output still queued, which does not happen on Linux and so cannot fail a test on
+`ubuntu-latest`. The branch ruleset does not require that job yet.
 
 The link check copies three things from GitHub's rendering: the anchor each
 case expects, the HTML elements GitHub's sanitizer keeps, and the link schemes
