@@ -110,7 +110,7 @@ export async function applyPlan({
   // lag, so re-read a few times before calling it a failed fix.
   const fixed = new Set();
   for (const step of plan.steps) {
-    if (results.find((r) => r.id === step.id)?.status === 'applied') for (const id of step.fixes ?? []) fixed.add(id);
+    if (results.find((r) => r.id === step.id)?.status === 'applied') for (const id of step.fixes) fixed.add(id);
   }
   let final;
   for (let attempt = 1; attempt <= RETRIES; attempt += 1) {
