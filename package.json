@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "prepare": "husky",
-    "test": "node --test --experimental-test-coverage --test-coverage-branches=93 --test-coverage-lines=96 --test-coverage-exclude='**/*.test.mjs' --test-coverage-exclude='**/fake-gh.mjs' --test-coverage-exclude='**/fake-executable.mjs' --test-coverage-exclude='**/fake-environment.mjs' --test-coverage-exclude='**/vendor/**' --test-coverage-exclude='**/*.cases.mjs' \"scripts/*.test.mjs\" \"plugins/*/scripts/*.test.mjs\"",
+    "test": "node --test --experimental-test-coverage --test-coverage-branches=96 --test-coverage-lines=99 --test-coverage-exclude='**/*.test.mjs' --test-coverage-exclude='**/fake-gh.mjs' --test-coverage-exclude='**/fake-gh-cli.mjs' --test-coverage-exclude='**/fake-executable.mjs' --test-coverage-exclude='**/fake-environment.mjs' --test-coverage-exclude='**/vendor/**' --test-coverage-exclude='**/*.cases.mjs' \"scripts/*.test.mjs\" \"plugins/*/scripts/*.test.mjs\"",
     "lint:manifests": "node scripts/check-manifests.mjs",
     "lint:links": "node scripts/check-links.mjs",
     "lint:actions": "node scripts/check-actions.mjs",
