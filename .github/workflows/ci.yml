@@ -17,6 +17,32 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # The script tests also run on macOS, where a pipe write is asynchronous and
+  # a script that exits right after printing can lose output still queued. On
+  # Linux the write completes first, so a test for it passes there with or
+  # without the fix. It is a separate job and not a matrix leg of the lint job,
+  # so the name of the check the branch ruleset requires does not change.
+  macos-tests:
+    name: Script tests on macOS
+
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run the script tests
+        run: npm test
+
   lint:
     name: Lint and Validate
 
