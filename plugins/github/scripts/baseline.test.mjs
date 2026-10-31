@@ -127,3 +127,16 @@ test('every error names the source file', () => {
   const { errors } = resolveBaseline('protected_branches: []\n', { source: 'x.yml' });
   assert.ok(errors.every((e) => e.startsWith('x.yml: ')));
 });
+
+test('resolveBaseline reports a YAML syntax error with its source and line', () => {
+  const { errors } = resolveBaseline('protected_branches: [main\nmerge_methods: {', { source: 'baseline.yml' });
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /^baseline\.yml: line \d+: /);
+});
+
+test('resolveBaseline says what kind of value it found where it wanted another', () => {
+  hasError('merge_methods: null\n', 'merge_methods must be a mapping, not null');
+  hasError('merge_methods:\n  merge: {}\n', 'merge_methods.merge must be true or false, not a mapping');
+  hasError('repository: [a]\n', 'repository must be a mapping, not a list');
+  hasError('actions:\n  can_approve_pull_request_reviews: 3\n', 'must be true or false, not number 3');
+});

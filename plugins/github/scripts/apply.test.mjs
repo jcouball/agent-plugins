@@ -97,6 +97,20 @@ test('a settings fix and an Actions fix apply, verify, and leave a clean audit',
   assert.deepEqual(result.audit.checks.filter((c) => c.status === 'drift'), []);
 });
 
+test('an Actions fix still applies when the repository settings could not be read', async () => {
+  const rs = ruleset({ conditions: { ref_name: { include: ['refs/heads/main', 'refs/heads/master'], exclude: [] } } });
+  const routes = compliantRoutes([rs]);
+  routes['GET repos/acme/widgets/actions/permissions/workflow'].default_workflow_permissions = 'write';
+  const srv = server(routes);
+  routes['GET repos/acme/widgets'] = { status: 403, message: 'Forbidden' };
+  const built = plan(routes);
+  assert.deepEqual(built.plan.steps.map((s) => s.id), ['actions-default_workflow_permissions']);
+  const result = await applyPlan({ gh: built.gh, plan: built.plan, baseline: DEFAULTS, sleep: noSleep });
+  assert.equal(result.status, 'applied');
+  assert.deepEqual(result.steps.map((s) => s.status), ['applied']);
+  assert.deepEqual(srv.writes, [['PUT actions', { default_workflow_permissions: 'read' }]]);
+});
+
 test('the Actions re-read waits out a lagging write', async () => {
   const routes = compliantRoutes([ruleset({ conditions: { ref_name: { include: ['refs/heads/main', 'refs/heads/master'], exclude: [] } } })]);
   routes['GET repos/acme/widgets/actions/permissions/workflow'].can_approve_pull_request_reviews = true;
