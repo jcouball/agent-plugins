@@ -21,7 +21,10 @@ jobs:
   # a script that exits right after printing can lose output still queued. On
   # Linux the write completes first, so a test for it passes there with or
   # without the fix. It is a separate job and not a matrix leg of the lint job,
-  # so the name of the check the branch ruleset requires does not change.
+  # so the name of the check the branch ruleset requires does not change. It
+  # runs the tests without the coverage gate, which Linux holds: coverage does
+  # not depend on the platform, and on one run in four the macOS runner
+  # reported a branch less than the tests reach.
   macos-tests:
     name: Script tests on macOS
 
@@ -41,7 +44,7 @@ jobs:
         run: npm ci
 
       - name: Run the script tests
-        run: npm test
+        run: npm run test:run
 
   lint:
     name: Lint and Validate
