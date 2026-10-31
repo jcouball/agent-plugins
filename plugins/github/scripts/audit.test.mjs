@@ -606,3 +606,30 @@ test('rulesets that bind part of a family are pooled unless their selectors prov
   // Two that cannot are kept apart.
   assert.equal(empty(pair('refs/heads/release/1/*', 'refs/heads/release/2/*')), false);
 });
+
+test('a pattern no readable ruleset covers is partial, not drift, while a ruleset could not be read', () => {
+  const hidden = ruleset({ id: 7, name: 'Hidden', source_type: 'Organization', source: 'acme' });
+  const routes = compliantRoutes([hidden]);
+  routes['GET orgs/acme/rulesets/7'] = { status: 403, message: 'Must have admin rights' };
+  const { checks } = run(routes);
+  const coverage = byId(checks, 'pattern:main.coverage');
+  assert.equal(coverage.status, 'partial');
+  assert.match(coverage.detail, /no active ruleset covers the pattern \(ruleset 7 unreadable: /);
+});
+
+test('a bypass actor that appears twice in a ruleset is reported once for each place it applies', () => {
+  const actors = [{ actor_type: 'DeployKey', bypass_mode: 'always' }, { actor_type: 'DeployKey', bypass_mode: 'exempt' }];
+  const rs = ruleset({ conditions: BOTH, bypass_actors: actors });
+  const { checks } = run(compliantRoutes([rs]));
+  const ids = checks.filter((c) => c.group === 'bypass').map((c) => c.id);
+  assert.ok(ids.length > 0);
+  assert.equal(new Set(ids).size, ids.length);
+  assert.ok(ids.every((id) => id.includes(':DeployKey:unknown:')));
+});
+
+test('the bypass message says is for one unenforced rule and are for several', () => {
+  const bypassed = ruleset({ conditions: BOTH, bypass_actors: [{ actor_id: 5, actor_type: 'Team', bypass_mode: 'always' }] });
+  const detail = (text) => run(compliantRoutes([bypassed]), baseline(text)).checks.find((c) => c.group === 'bypass').detail;
+  assert.match(detail('branch_rules: [pull_request]\n'), /^on pattern main, pull_request is not enforced for this actor/);
+  assert.match(detail('branch_rules: [pull_request, deletion]\n'), /^on pattern main, pull_request, deletion are not enforced for this actor/);
+});

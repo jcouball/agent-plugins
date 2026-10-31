@@ -188,6 +188,26 @@ test('a refused settings PATCH names the settings page and holds a ruleset write
   assert.deepEqual(srv.writes, []);
 });
 
+test('a rule held on a refused settings fix says so when the repository then enables no method', async () => {
+  const mergeOnly = {
+    allow_merge_commit: true, allow_squash_merge: false, allow_rebase_merge: false,
+    delete_branch_on_merge: true, allow_auto_merge: false,
+  };
+  const routes = compliantRoutes([]);
+  const srv = server(routes);
+  // Someone turns every merge method off while the refused write is being handled.
+  routes['GET repos/acme/widgets'] = (body, calls) => (
+    calls.some((c) => c.method === 'PATCH')
+      ? { ...mergeOnly, allow_merge_commit: false }
+      : mergeOnly);
+  routes['PATCH repos/acme/widgets'] = { status: 403, message: 'Must have admin rights to Repository.' };
+  const built = plan(routes);
+  const result = await applyPlan({ gh: built.gh, plan: built.plan, baseline: DEFAULTS, sleep: noSleep });
+  assert.deepEqual(result.steps.map((s) => s.status), ['refused', 'skipped', 'skipped']);
+  assert.match(result.steps[1].reason, /while the repository enables no method, leaving every matched branch unmergeable/);
+  assert.deepEqual(srv.writes, []);
+});
+
 test('a failed widening ruleset write aborts the transition but not unrelated writes', async () => {
   const a = ruleset({
     id: 1, name: 'A', conditions: { ref_name: { include: ['refs/heads/main', 'refs/heads/master'], exclude: [] } },
@@ -268,6 +288,17 @@ test('an empty body on the Actions re-read leaves the write unverified instead o
   const result = await applyPlan({ gh: built.gh, plan: built.plan, baseline: DEFAULTS, sleep: noSleep });
   assert.equal(result.steps[0].status, 'unverified');
   assert.match(result.steps[0].message, /no fields/);
+});
+
+test('a failed Actions re-read leaves the write unverified and says why', async () => {
+  const routes = compliantRoutes([ruleset({ conditions: { ref_name: { include: ['refs/heads/main', 'refs/heads/master'], exclude: [] } } })]);
+  routes['GET repos/acme/widgets/actions/permissions/workflow'].default_workflow_permissions = 'write';
+  const srv = server(routes);
+  const built = plan(routes);
+  routes['GET repos/acme/widgets/actions/permissions/workflow'] = () => (srv.writes.length ? { status: 500, message: 'boom' } : srv.workflow);
+  const result = await applyPlan({ gh: built.gh, plan: built.plan, baseline: DEFAULTS, sleep: noSleep });
+  assert.equal(result.steps[0].status, 'unverified');
+  assert.equal(result.steps[0].message, 're-read failed on attempt 1: boom');
 });
 
 test('ruleset writes go in plan order with the exact bodies', async () => {
