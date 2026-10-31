@@ -231,7 +231,7 @@ async function main(argv) {
   } catch (err) {
     if (err instanceof GhError || err instanceof ResolveError || err instanceof LocateError) return fail(err.message);
     // Every subcommand prints one JSON document, an unforeseen failure included.
-    return fail(`unexpected error: ${err?.stack ?? err}`);
+    return fail(`unexpected error: ${err.stack}`);
   }
 }
 
