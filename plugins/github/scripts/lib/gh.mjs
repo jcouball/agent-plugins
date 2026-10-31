@@ -29,8 +29,8 @@ export function createGh() {
     return {
       ok: result.status === 0,
       status: result.status,
-      stdout: result.stdout ?? '',
-      stderr: result.stderr ?? '',
+      stdout: result.stdout,
+      stderr: result.stderr,
     };
   };
 }
