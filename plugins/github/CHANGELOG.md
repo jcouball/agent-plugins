@@ -1,5 +1,24 @@
 # Changelog
 
+## [3.2.0](https://github.com/jcouball/agent-plugins/compare/github-v3.1.0...github-v3.2.0) (2026-10-31)
+
+
+### Features
+
+* **github:** Audit the default GITHUB_TOKEN permissions in check-repo-config ([91660ab](https://github.com/jcouball/agent-plugins/commit/91660ab0d88b663bf044ff29a55e16e44ea7fe7c)), closes [#83](https://github.com/jcouball/agent-plugins/issues/83)
+* **github:** Move the check-repo-config procedure into a tested script ([ccdd7aa](https://github.com/jcouball/agent-plugins/commit/ccdd7aa9c9e4a46239eff5ca098fcd9b9c160521)), closes [#86](https://github.com/jcouball/agent-plugins/issues/86) [#90](https://github.com/jcouball/agent-plugins/issues/90)
+
+
+### Bug Fixes
+
+* **github:** Re-read the Actions token after a PUT until it matches ([bd20799](https://github.com/jcouball/agent-plugins/commit/bd207996ee5478a47141184d7db40134dcab9bc8)), closes [#91](https://github.com/jcouball/agent-plugins/issues/91)
+* **github:** Read whether Actions is enabled before auditing the token default ([5eb8360](https://github.com/jcouball/agent-plugins/commit/5eb8360d5dba9e06a5be73df991ddb226d6272f8)), closes [#88](https://github.com/jcouball/agent-plugins/issues/88)
+
+
+### Other Changes
+
+* **github:** Vendor js-yaml 5.5.0 byte for byte ([c0dc69b](https://github.com/jcouball/agent-plugins/commit/c0dc69ba9d64ad0e6c6a5506bdfa3816aa06c87c))
+
 ## [3.1.0](https://github.com/jcouball/agent-plugins/compare/github-v3.0.0...github-v3.1.0) (2026-08-30)
 
 
