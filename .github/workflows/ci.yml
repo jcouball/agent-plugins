@@ -45,7 +45,7 @@ jobs:
         run: npm ci
 
       - name: Run the script tests
-        run: npm run test:run
+        run: npm test
 
       - name: Validate manifests
         run: npm run lint:manifests
