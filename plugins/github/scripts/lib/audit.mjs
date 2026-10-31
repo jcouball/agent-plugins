@@ -268,7 +268,7 @@ export function audit(state, baseline) {
     }
     const { covering, groups, linearFor } = patternGroups(pattern, active, rulesOf);
     const partialNote = unreadable.length
-      ? ` (${unreadable.map((u) => `ruleset ${u.summary?.id ?? u.href} unreadable: ${u.message}`).join('; ')})`
+      ? ` (${unreadable.map((u) => `ruleset ${u.summary.id} unreadable: ${u.message}`).join('; ')})`
       : '';
     if (covering.length === 0) {
       add({
@@ -343,7 +343,7 @@ function actorKey(actor) {
 }
 
 function hasNonPrBypass(rs, key) {
-  return (rs.bypass_actors ?? []).some((a) => actorKey(a) === key && a.bypass_mode !== 'pull_request');
+  return rs.bypass_actors.some((a) => actorKey(a) === key && a.bypass_mode !== 'pull_request');
 }
 
 function auditBypasses({ add, baseline, active, state, protectedBranches }) {
@@ -371,7 +371,7 @@ function auditBypasses({ add, baseline, active, state, protectedBranches }) {
   const reported = new Set();
   for (const context of contexts) {
     for (const { rs } of context.rulesets) {
-      for (const actor of rs.bypass_actors ?? []) {
+      for (const actor of rs.bypass_actors) {
         if (actor.bypass_mode === 'pull_request') continue;
         const key = actorKey(actor);
         const enforced = new Set();
@@ -434,16 +434,18 @@ function rulesetBody(rs, rules) {
     name: rs.name,
     target: rs.target,
     enforcement: rs.enforcement,
-    bypass_actors: rs.bypass_actors ?? [],
+    bypass_actors: rs.bypass_actors,
     conditions: rs.conditions,
     rules,
   };
 }
 
+// `rules` come from mergedRules, which leaves a pull_request rule with its
+// parameters, and its one caller skips a write without one.
 function withMethods(rules, methods) {
   const copy = structuredClone(rules);
   const pr = pullRequestRule(copy);
-  if (pr) pr.parameters = { ...(pr.parameters ?? {}), allowed_merge_methods: MERGE_METHODS.filter((m) => methods.includes(m)) };
+  pr.parameters = { ...pr.parameters, allowed_merge_methods: MERGE_METHODS.filter((m) => methods.includes(m)) };
   return copy;
 }
 
@@ -458,7 +460,7 @@ function qualifies(rs, expectedIncludes) {
   if (!includes.every((s) => expectedIncludes.has(s))) return false;
   if (new Set(includes).size !== includes.length) return false;
   if (excludesOf(rs).length !== 0) return false;
-  if ((rs.bypass_actors ?? []).some((a) => a.bypass_mode !== 'pull_request')) return false;
+  if (rs.bypass_actors.some((a) => a.bypass_mode !== 'pull_request')) return false;
   return true;
 }
 
@@ -488,7 +490,7 @@ function buildPlan({ state, baseline, checks, enabled, active, unreadable, where
   if (!state.rulesetList.ok) {
     rulesetsBlocked = `rulesets could not be listed (${describeFailure(state.rulesetList)})`;
   } else if (unreadable.length) {
-    rulesetsBlocked = `${unreadable.map((u) => `ruleset ${u.summary?.id ?? u.href} could not be read (${describeFailure(u)})`).join('; ')}; without its conditions, merge methods, and bypasses no ruleset write or merge-method change can be proven safe`;
+    rulesetsBlocked = `${unreadable.map((u) => `ruleset ${u.summary.id} could not be read (${describeFailure(u)})`).join('; ')}; without its conditions, merge methods, and bypasses no ruleset write or merge-method change can be proven safe`;
   }
 
   const rulesetDrift = rulesetCheckIds.some((id) => drifted.has(id));
