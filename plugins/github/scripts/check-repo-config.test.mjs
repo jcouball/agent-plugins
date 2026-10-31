@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { fakeTools } from '../../../scripts/fake-executable.mjs';
+import { fakeTools, linkTools } from '../../../scripts/fake-executable.mjs';
 import { REPO, compliantRoutes } from './fake-gh.mjs';
 
 const SCRIPT = fileURLToPath(new URL('./check-repo-config.mjs', import.meta.url));
@@ -101,20 +101,6 @@ function runGh(cwd, routes, args, { repoView } = {}) {
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
-}
-
-// Where an executable is on the PATH this process has.
-function onPath(name) {
-  for (const dir of process.env.PATH.split(path.delimiter)) {
-    const candidate = path.join(dir, name);
-    try {
-      fs.accessSync(candidate, fs.constants.X_OK);
-      if (fs.statSync(candidate).isFile()) return candidate;
-    } catch {
-      // Not in this directory.
-    }
-  }
-  throw new Error(`${name} is not on PATH`);
 }
 
 function track(dir, ...files) {
@@ -274,8 +260,9 @@ test('outside a Git repository the script says so', () => {
 test('a missing gh is reported as an error, not a stack trace', () => {
   const dir = repository();
   // Only git on PATH, since the script runs git before it ever calls gh.
-  const { dir: tools, env } = fakeTools({ git: `exec ${sh(onPath('git'))} "$@"` });
+  const { dir: tools, env } = fakeTools({});
   try {
+    linkTools(tools, ['git']);
     const result = spawnSync(process.execPath, [SCRIPT, 'audit'], { cwd: dir, encoding: 'utf8', env: { ...env, PATH: tools } });
     assert.equal(result.status, 1);
     assert.equal(JSON.parse(result.stdout).error, 'gh is not installed or not on PATH');
