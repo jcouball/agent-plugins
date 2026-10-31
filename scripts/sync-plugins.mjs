@@ -9,6 +9,10 @@
 // Usage:
 //   npm run sync              # every plugin
 //   npm run sync -- writing   # one plugin
+//
+// It works on the repository it sits in. SYNC_PLUGINS_ROOT names another one,
+// which is how a test points the original script at a fixture. The script says
+// so when it is set.
 
 import { readFileSync, existsSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
@@ -16,7 +20,10 @@ import { join, dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { fileURLToPath } from 'node:url'
 
-const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
+const scripts = dirname(fileURLToPath(import.meta.url))
+// Absolute, because every command below runs with root as its working directory
+// and some are handed root as an argument; a relative path would resolve twice.
+const root = resolve(process.env.SYNC_PLUGINS_ROOT ?? join(scripts, '..'))
 const only = process.argv[2]
 
 const die = (message) => {
@@ -54,7 +61,8 @@ const atDefaultBranch = (path) => {
 // malformed manifest in terms you can act on. Parsing it here first would
 // report the same problem as a stack trace.
 step('Validating manifests')
-if (!runVisible(process.execPath, [join(root, 'scripts/check-manifests.mjs')])) {
+if (process.env.SYNC_PLUGINS_ROOT) note(`working on ${root}, from SYNC_PLUGINS_ROOT`)
+if (!runVisible(process.execPath, [join(scripts, 'check-manifests.mjs'), root])) {
   die('manifest check failed. Fix the manifests before syncing.')
 }
 
