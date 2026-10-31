@@ -57,6 +57,17 @@ test('write rewrites a stale block in place, marker and body both', () => {
   assert.equal(inspectText(result.text, ['main']).classification, 'machine-current');
 });
 
+test('inspect counts the markers it found, in the singular or the plural', () => {
+  const { block, hash } = renderBlock(['main']);
+  const begin = `<!-- jcouball-github guardrails: begin sha256:${hash} -->\n`;
+  const detail = (text) => inspectText(text, ['main']).detail;
+  assert.equal(detail(`${block}${block}`), '2 begin markers and 2 end markers');
+  assert.equal(detail(begin), '1 begin marker and 0 end markers');
+  assert.equal(detail(`${END_MARKER}\n`), '0 begin markers and 1 end marker');
+  assert.equal(detail(`${begin}${END_MARKER}\n${END_MARKER}\n`), '1 begin marker and 2 end markers');
+  assert.equal(detail(`${END_MARKER}\n${begin}`), 'the end marker comes before the begin marker');
+});
+
 test('write leaves a current block alone and refuses edited or malformed files', () => {
   const current = renderBlock(['main']);
   assert.equal(writeBlock(current.block, ['main']).action, 'unchanged');
