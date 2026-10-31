@@ -49,7 +49,7 @@ export function parseYaml(source) {
     documents = loadAll(source, { schema: CORE_SCHEMA });
   } catch (err) {
     if (!(err instanceof YAMLException)) throw err;
-    const where = typeof err.mark?.line === 'number' ? `line ${err.mark.line + 1}: ` : '';
+    const where = `line ${err.mark.line + 1}: `;
     return { error: `${where}${err.reason}` };
   }
   if (documents.length > 1) return { error: 'more than one document' };

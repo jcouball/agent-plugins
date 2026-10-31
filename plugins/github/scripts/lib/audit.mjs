@@ -561,11 +561,13 @@ function buildPlan({ state, baseline, checks, enabled, active, unreadable, where
     hold(mergeFieldIds, holdMergeFields, [where.settings, where.rules]);
   }
 
+  // A baseline's branch_rules must name pull_request, so every ruleset write
+  // carries a pull_request rule after the merge, whether or not it had one.
   const mergeAllowed = settingsOk && !holdMergeFields;
   const prNarrowing = rulesetWrites.some(({ rs, rules }) => {
     const before = pullRequestRule(rs.rules);
     const after = pullRequestRule(rules);
-    return Boolean(before && after) && prMethods(before).some((m) => !prMethods(after).includes(m));
+    return Boolean(before) && prMethods(before).some((m) => !prMethods(after).includes(m));
   });
   const transition = (mergeAllowed && mergeDrift) || prNarrowing;
 
@@ -599,7 +601,7 @@ function buildPlan({ state, baseline, checks, enabled, active, unreadable, where
   for (const { rs, rules } of rulesetWrites) {
     const before = pullRequestRule(rs.rules);
     const after = pullRequestRule(rules);
-    if (!before || !after) continue;
+    if (!before) continue;
     const union = MERGE_METHODS.filter((m) => prMethods(before).includes(m) || prMethods(after).includes(m));
     const widened = withMethods(rules, union);
     if (sameJson(widened, rules)) continue;
@@ -628,7 +630,7 @@ function buildPlan({ state, baseline, checks, enabled, active, unreadable, where
     steps.push({
       id: `ruleset-${rs.id}`, kind: 'put_ruleset', method: 'PUT', path: repoPath(repository, `/rulesets/${rs.id}`),
       body: rulesetBody(rs, rules), phase: transition ? 'narrow' : 'independent', transition,
-      ruleset_id: rs.id, final_pr_methods: after ? prMethods(after) : null, fixes: rulesetFixes, where: where.rules,
+      ruleset_id: rs.id, final_pr_methods: prMethods(after), fixes: rulesetFixes, where: where.rules,
       description: `merge the baseline into ${describeRuleset(rs)}`,
     });
   }
