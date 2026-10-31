@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DEFAULTS, resolveBaseline } from './lib/baseline.mjs';
 import { readState, resolveRepository, snapshot } from './lib/read.mjs';
-import { audit, CREATED_RULESET_NAME } from './lib/audit.mjs';
+import { audit, CREATED_RULESET_NAME, evaluateMethods } from './lib/audit.mjs';
 import {
   REPO, compliantRoutes, effectiveRules, fakeGh, ruleset,
 } from './fake-gh.mjs';
@@ -499,4 +499,110 @@ test('the repository URLs follow the resolved host', () => {
   assert.deepEqual(byId(checks, 'repository.allow_rebase_merge').where, ['https://ghe.example.com/acme/widgets/settings']);
   assert.equal(statuses(checks)['repository.allow_rebase_merge'], 'partial');
   assert.equal(REPO.host, 'github.com');
+});
+
+// ---------------------------------------------------------------------------
+// Shapes GitHub documents as optional, and the paths that handle them.
+
+const BOTH = { ref_name: { include: ['refs/heads/main', 'refs/heads/master'], exclude: [] } };
+const rest = [{ type: 'deletion' }, { type: 'non_fast_forward' }, { type: 'required_linear_history' }];
+
+test('evaluateMethods finds no problem when no pull_request rule applies', () => {
+  assert.deepEqual(evaluateMethods([], { enabled: ['rebase'], linear: false }), { intersection: [], problems: [] });
+});
+
+test('a pull_request rule that does not list its merge methods allows all of them', () => {
+  for (const pullRequest of [{ type: 'pull_request' }, { type: 'pull_request', parameters: {} }]) {
+    const rs = ruleset({ conditions: BOTH, rules: [...rest, pullRequest] });
+    const { checks, plan } = run(compliantRoutes([rs]));
+    assert.match(byId(checks, 'pattern:main.merge_methods').detail, /allows merge, which the baseline disables; allows squash/);
+    const kinds = plan.steps.map((s) => s.kind);
+    assert.deepEqual(kinds, ['put_ruleset', 'put_ruleset']);
+    const [widen, narrow] = plan.steps;
+    const methods = (step) => step.body.rules.find((r) => r.type === 'pull_request').parameters.allowed_merge_methods;
+    assert.deepEqual(methods(widen), ['merge', 'squash', 'rebase']);
+    assert.deepEqual(methods(narrow), ['rebase']);
+  }
+});
+
+test('a ruleset whose detail has no ref_name condition covers nothing and is not pooled', () => {
+  const routes = compliantRoutes([ruleset({ conditions: BOTH })]);
+  routes['GET repos/acme/widgets/rulesets/1'] = ruleset({ conditions: {} });
+  const { checks } = run(routes);
+  assert.equal(byId(checks, 'pattern:main.coverage').status, 'drift');
+  assert.equal(byId(checks, 'pattern:main.coverage').actual, 'none');
+});
+
+test('a bypass actor with no type or id is named unknown', () => {
+  const rs = ruleset({ conditions: BOTH, bypass_actors: [{ bypass_mode: 'always' }] });
+  const { checks } = run(compliantRoutes([rs]));
+  const bypass = checks.filter((c) => c.group === 'bypass');
+  assert.ok(bypass.length > 0);
+  assert.match(bypass[0].label, /unknown:unknown \(always\)/);
+});
+
+test('a ruleset with the right scope but a missing rule type is merged into, rule by rule', () => {
+  const rs = ruleset({
+    conditions: BOTH,
+    rules: [{ type: 'pull_request', parameters: { allowed_merge_methods: ['rebase'] } }],
+  });
+  const { plan } = run(compliantRoutes([rs]));
+  assert.deepEqual(plan.steps.map((s) => s.kind), ['put_ruleset']);
+  assert.deepEqual(plan.steps[0].body.rules.map((r) => r.type), ['pull_request', 'non_fast_forward', 'deletion', 'required_linear_history']);
+});
+
+test('a pull_request rule with no parameters is given the methods the baseline enables when merged into', () => {
+  const rs = ruleset({ conditions: BOTH, rules: [{ type: 'pull_request' }] });
+  const { plan } = run(compliantRoutes([rs]));
+  const [widen, narrow] = plan.steps;
+  const parameters = (step) => step.body.rules.find((r) => r.type === 'pull_request').parameters;
+  assert.deepEqual([widen.id, narrow.id], ['ruleset-1-widen', 'ruleset-1']);
+  assert.deepEqual(parameters(widen), { allowed_merge_methods: ['merge', 'squash', 'rebase'] });
+  assert.deepEqual(parameters(narrow), { allowed_merge_methods: ['rebase'] });
+});
+
+test('a ruleset with the right number of selectors is not exact scope unless they are the protected patterns, once each', () => {
+  for (const include of [['refs/heads/main', 'refs/heads/other'], ['refs/heads/main', 'refs/heads/main']]) {
+    const rs = ruleset({ conditions: { ref_name: { include, exclude: [] } }, rules: [...rest, { type: 'pull_request', parameters: { allowed_merge_methods: ['rebase'] } }] });
+    const { plan } = run(compliantRoutes([rs]));
+    assert.deepEqual(plan.steps.map((s) => s.kind), ['post_ruleset'], JSON.stringify(include));
+  }
+});
+
+test('a ruleset with a ref_name condition that names no exclusions still covers its patterns', () => {
+  const rs = ruleset({ conditions: { ref_name: { include: ['refs/heads/main', 'refs/heads/master'] } } });
+  const { checks } = run(compliantRoutes([rs]));
+  assert.equal(byId(checks, 'pattern:main.coverage').status, 'pass');
+});
+
+test('an exact-scope ruleset with no pull_request rule is given the full one', () => {
+  const rs = ruleset({ conditions: BOTH, rules: rest });
+  const { plan } = run(compliantRoutes([rs]));
+  assert.deepEqual(plan.steps.map((s) => s.kind), ['put_ruleset']);
+  const added = plan.steps[0].body.rules.find((r) => r.type === 'pull_request');
+  assert.deepEqual(added.parameters.allowed_merge_methods, ['rebase']);
+  assert.equal(added.parameters.required_approving_review_count, 0);
+});
+
+// Two rulesets that bind part of the same family without covering it are only
+// pooled when something could match both: the pooled intersection of a
+// rebase-only and a squash-only rule is empty, which separate groups never
+// show.
+test('rulesets that bind part of a family are pooled unless their selectors provably cannot overlap', () => {
+  const pr = (methods) => [...rest, { type: 'pull_request', parameters: { allowed_merge_methods: methods } }];
+  const pair = (a, b) => [
+    ruleset({ id: 1, name: 'A', conditions: { ref_name: { include: [a], exclude: [] } }, rules: pr(['rebase']) }),
+    ruleset({ id: 2, name: 'B', conditions: { ref_name: { include: [b], exclude: [] } }, rules: pr(['squash']) }),
+  ];
+  const base = baseline('protected_branches: ["release/**/*"]\n');
+  const empty = (rulesets) => {
+    const { checks } = run(compliantRoutes(rulesets, ['release/1/x']), base);
+    return checks.some((c) => /no merge method is allowed by every applicable/.test(c.detail ?? ''));
+  };
+  // A selector that is not a pattern cannot be proved disjoint from anything.
+  assert.equal(empty(pair('refs/heads/release/1/*', '~DEFAULT_BRANCH')), true);
+  // Two patterns that can match the same branch are not provably disjoint.
+  assert.equal(empty(pair('refs/heads/release/1/*', 'refs/heads/release/1/a*')), true);
+  // Two that cannot are kept apart.
+  assert.equal(empty(pair('refs/heads/release/1/*', 'refs/heads/release/2/*')), false);
 });
