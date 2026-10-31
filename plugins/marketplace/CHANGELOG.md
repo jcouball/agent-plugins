@@ -1,5 +1,14 @@
 # Changelog
 
+## [2.0.2](https://github.com/jcouball/agent-plugins/compare/marketplace-v2.0.1...marketplace-v2.0.2) (2026-10-31)
+
+
+### Bug Fixes
+
+* **marketplace:** Drop the per-file sha256 values from NOTICE.md ([876c408](https://github.com/jcouball/agent-plugins/commit/876c408a4f980e2b4ad86b0342070e064b76f648)), closes [#100](https://github.com/jcouball/agent-plugins/issues/100)
+* **marketplace:** Put the upstream LICENSE beside a vendored skill ([bc60f5e](https://github.com/jcouball/agent-plugins/commit/bc60f5e1a6ef5e3eb6bf1fbf6c75043009293c1c))
+* **marketplace:** Say why a vendored skill update is feat or fix ([9c4b84f](https://github.com/jcouball/agent-plugins/commit/9c4b84f265c5b7b80b7ca5cc690427e91fbd62fd)), closes [#97](https://github.com/jcouball/agent-plugins/issues/97)
+
 ## [2.0.1](https://github.com/jcouball/agent-plugins/compare/marketplace-v2.0.0...marketplace-v2.0.1) (2026-10-11)
 
 
