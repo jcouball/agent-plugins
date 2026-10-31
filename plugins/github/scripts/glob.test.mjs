@@ -68,3 +68,9 @@ test('selectors: ~ALL and ~DEFAULT_BRANCH are never provably disjoint', () => {
   assert.equal(selectorProvablyDisjoint('refs/heads/docs/*', 'main'), true);
   assert.equal(selectorProvablyDisjoint('refs/tags/v*', 'main'), false);
 });
+
+test('a [ with no closing ] matches itself, not a class', () => {
+  assert.equal(matchesPattern('a[b', 'a[b'), true);
+  assert.equal(matchesPattern('a[b', 'ab'), false);
+  assert.equal(matchesPattern('release/[1.*', 'release/[1.2'), true);
+});

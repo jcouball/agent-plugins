@@ -140,3 +140,13 @@ test('resolveBaseline says what kind of value it found where it wanted another',
   hasError('repository: [a]\n', 'repository must be a mapping, not a list');
   hasError('actions:\n  can_approve_pull_request_reviews: 3\n', 'must be true or false, not number 3');
 });
+
+test('resolveBaseline says an actions section that is not a mapping is wrong', () => {
+  hasError('actions: 3\n', 'actions must be a mapping, not number 3');
+  hasError('actions: [read]\n', 'actions must be a mapping, not a list');
+});
+
+test('parseYaml does not report an error that is not a YAML syntax error as one', () => {
+  const unreadable = { toString() { throw new Error('not a syntax error'); } };
+  assert.throws(() => parseYaml(unreadable), /not a syntax error/);
+});
