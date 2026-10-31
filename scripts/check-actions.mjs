@@ -23,12 +23,12 @@
 // ships a zip rather than a tarball, and 32-bit or armv6 Linux, because upstream
 // publishes those but no checksum for them is pinned below.
 
-import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { arch, platform } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { downloadActionlint } from './lib/download-actionlint.mjs'
 
 const version = '1.7.12'
 
@@ -41,9 +41,6 @@ const checksums = {
   'linux_amd64': '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8',
   'linux_arm64': '325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6',
 }
-
-const targets = { x64: 'amd64', arm64: 'arm64' }
-const target = `${platform()}_${targets[arch()] ?? arch()}`
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -82,44 +79,20 @@ const versionOf = (binary) => {
 }
 
 const download = async () => {
-  if (!checksums[target]) {
-    fail(
-      `no pinned actionlint build for ${target}. ` +
-        `Install actionlint ${version} yourself and put it on PATH: ` +
-        'https://github.com/rhysd/actionlint/releases'
-    )
-  }
-
-  const archive = `actionlint_${version}_${target}.tar.gz`
-  const url = `https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}`
-
-  console.log(`downloading actionlint ${version} for ${target}`)
-
-  let body
   try {
-    const response = await fetch(url)
-    if (!response.ok) fail(`GET ${url} returned ${response.status}`)
-    body = Buffer.from(await response.arrayBuffer())
+    return await downloadActionlint({
+      version,
+      checksums,
+      platform: platform(),
+      arch: arch(),
+      fetch,
+      tar: 'tar',
+      directory: scratch,
+      log: console.log,
+    })
   } catch (error) {
-    fail(`could not download ${url}: ${error.message}`)
+    return fail(error.message)
   }
-
-  const digest = createHash('sha256').update(body).digest('hex')
-  if (digest !== checksums[target]) {
-    fail(`checksum mismatch for ${archive}\n  expected ${checksums[target]}\n  got      ${digest}`)
-  }
-
-  const tarball = join(scratch, archive)
-  writeFileSync(tarball, body)
-
-  const untar = spawnSync('tar', ['-xzf', tarball, '-C', scratch], { encoding: 'utf8' })
-  if (untar.status !== 0) fail(`could not extract ${archive}: ${untar.stderr ?? untar.error?.message}`)
-
-  const extracted = join(scratch, 'actionlint')
-  if (!existsSync(extracted)) fail(`${archive} did not contain an actionlint binary`)
-  chmodSync(extracted, 0o755)
-
-  return extracted
 }
 
 // Only an exact match. A different version would lint by different rules
