@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2](https://github.com/jcouball/agent-plugins/compare/writing-v1.5.1...writing-v1.5.2) (2026-10-31)
+
+
+### Bug Fixes
+
+* **writing:** Ship the unslop skill's MIT notice inside the plugin ([3052ebd](https://github.com/jcouball/agent-plugins/commit/3052ebde85118f82522ab98a294389e810755b1e)), closes [#98](https://github.com/jcouball/agent-plugins/issues/98)
+
 ## [1.5.1](https://github.com/jcouball/agent-plugins/compare/writing-v1.5.0...writing-v1.5.1) (2026-10-28)
 
 
