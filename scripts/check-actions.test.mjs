@@ -9,10 +9,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { spawn, spawnSync } from 'node:child_process'
-import { readdirSync, rmSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { mkdtempSync, readdirSync, rmSync, symlinkSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { delimiter, dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { fakeTools } from './fake-executable.mjs'
+import { fakeTools, linkTools, onPath } from './fake-executable.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const script = join(here, 'check-actions.mjs')
@@ -21,10 +22,12 @@ const preload = pathToFileURL(join(here, 'fake-environment.mjs')).href
 // What a fake actionlint does when asked for its version, and then when run.
 const versioned = (run, version = '1.7.12') => `if [ "$1" = --version ]; then echo ${version}; exit 0; fi\n${run}`
 
-// Run the script with only the given tools on PATH.
-const check = (tools, env = {}) => {
+// Run the script with only the given tools on PATH, and the real tools named
+// in `real` linked beside them.
+const check = (tools, env = {}, real = []) => {
   const { dir, env: base } = fakeTools(tools)
   try {
+    linkTools(dir, real)
     return spawnSync(process.execPath, [script], {
       env: { ...base, PATH: dir, NODE_OPTIONS: `--import=${preload}`, ...env },
       encoding: 'utf8',
@@ -54,9 +57,24 @@ test('check-actions reports an actionlint that a signal ended', () => {
 })
 
 test('check-actions reports an actionlint that is gone by the time it runs', () => {
-  const result = check({ actionlint: versioned('exit 0').replace('exit 0; fi', '/bin/rm "$0"; exit 0; fi') })
+  const result = check({ actionlint: versioned('exit 0').replace('exit 0; fi', 'rm "$0"; exit 0; fi') }, {}, ['rm'])
   assert.equal(result.status, 1)
   assert.match(result.stderr, /^actionlint check failed: spawnSync actionlint ENOENT\n/)
+})
+
+test('check-actions finds the real tools its fakes use when a PATH directory has a space in its name', () => {
+  const spaced = mkdtempSync(join(tmpdir(), 'check-actions path '))
+  const before = process.env.PATH
+  try {
+    symlinkSync(onPath('rm'), join(spaced, 'rm'))
+    process.env.PATH = `${spaced}${delimiter}${before}`
+    const result = check({ actionlint: versioned('exit 0').replace('exit 0; fi', 'rm "$0"; exit 0; fi') }, {}, ['rm'])
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /spawnSync actionlint ENOENT/)
+  } finally {
+    process.env.PATH = before
+    rmSync(spaced, { recursive: true, force: true })
+  }
 })
 
 test('check-actions downloads when the actionlint on PATH is another version', () => {
@@ -94,10 +112,10 @@ const runsPython = versioned('for a in "$@"; do case "$a" in -pyflakes=*) echo "
 
 // The stand-in for pyflakes is a shell script that runs cat and touch, which a
 // PATH holding only the fakes does not have.
-const coreutils = { cat: 'exec /bin/cat "$@"', touch: 'exec /usr/bin/touch "$@"' }
+const coreutils = ['cat', 'touch']
 
 test('check-actions notes that pyflakes is missing only when a workflow has a Python step', () => {
-  const python = check({ actionlint: runsPython, shellcheck: 'exit 0', ...coreutils })
+  const python = check({ actionlint: runsPython, shellcheck: 'exit 0' }, {}, coreutils)
   assert.equal(python.status, 0)
   assert.match(python.stderr, /^note: pyflakes is not on PATH, so the Python steps in these workflows went\n/)
   const none = check({ actionlint: versioned('exit 0'), shellcheck: 'exit 0' })
