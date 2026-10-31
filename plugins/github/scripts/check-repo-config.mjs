@@ -20,7 +20,6 @@
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { resolveBaseline } from './lib/baseline.mjs';
 import { createGh, GhError } from './lib/gh.mjs';
 import { readState, resolveRepository, ResolveError } from './lib/read.mjs';
@@ -236,6 +235,4 @@ async function main(argv) {
   }
 }
 
-if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  await main(process.argv.slice(2));
-}
+await main(process.argv.slice(2));
