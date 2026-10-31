@@ -17,16 +17,17 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # The script tests also run on macOS, where a pipe write is asynchronous and
-  # a script that exits right after printing can lose output still queued. On
-  # Linux the write completes first, so a test for it passes there with or
-  # without the fix. It is a separate job and not a matrix leg of the lint job,
-  # so the name of the check the branch ruleset requires does not change. It
-  # runs the tests without the coverage gate, which Linux holds: coverage does
-  # not depend on the platform, and on one run in four the macOS runner
-  # reported a branch less than the tests reach.
-  macos-tests:
-    name: Script tests on macOS
+  # The same steps as the Linux job below, on macOS, where most people who use
+  # these scripts run them. A pipe write is asynchronous there, so a script that
+  # exits right after printing can lose output still queued, which no test can
+  # catch on Linux. lint:actions also checks the pinned macOS actionlint
+  # download against its checksum for real. It is a separate job and not a
+  # matrix leg of the lint job, so the name of the check the branch ruleset
+  # requires does not change. It runs the tests without the coverage gate, which
+  # Linux holds: the gate fails at random on macOS with every test passing, and
+  # #125 replaces it. That is the one difference, and it ends there.
+  lint-macos:
+    name: Lint and Validate (macOS)
 
     runs-on: macos-latest
 
@@ -45,6 +46,18 @@ jobs:
 
       - name: Run the script tests
         run: npm run test:run
+
+      - name: Validate manifests
+        run: npm run lint:manifests
+
+      - name: Check markdown links
+        run: npm run lint:links
+
+      - name: Lint GitHub Actions workflows
+        run: npm run lint:actions
+
+      - name: Lint markdown
+        run: npm run lint:markdown
 
   lint:
     name: Lint and Validate
