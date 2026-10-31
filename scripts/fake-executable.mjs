@@ -9,7 +9,7 @@
 // carries on down PATH to the real tool, so a test meant to be isolated would
 // fetch origin, refresh installed plugins, or call GitHub.
 
-import { chmodSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { accessSync, chmodSync, constants, mkdirSync, mkdtempSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { delimiter, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -24,4 +24,29 @@ export const fakeTools = (tools) => {
     chmodSync(path, 0o755)
   }
   return { dir, env: { ...process.env, PATH: `${dir}${delimiter}${process.env.PATH}` } }
+}
+
+// Where an executable is on the PATH this process has. A test that hard-codes
+// /usr/bin/git fails on a host that keeps it somewhere else.
+export const onPath = (name) => {
+  for (const dir of process.env.PATH.split(delimiter)) {
+    const candidate = join(dir, name)
+    try {
+      accessSync(candidate, constants.X_OK)
+      // An empty or relative PATH entry means a directory under the working
+      // directory, and a symlink target is read from the link's own directory.
+      if (statSync(candidate).isFile()) return resolve(candidate)
+    } catch {
+      // Not in this directory.
+    }
+  }
+  throw new Error(`${name} is not on PATH`)
+}
+
+// Put the real tools in a directory fakeTools made, as symlinks, so a fake that
+// runs on a PATH holding nothing else can still call them by name. A symlink
+// keeps the path to the tool out of any shell command, where a space or an
+// apostrophe in it would have to be quoted.
+export const linkTools = (dir, names) => {
+  for (const name of names) symlinkSync(onPath(name), join(dir, name))
 }
