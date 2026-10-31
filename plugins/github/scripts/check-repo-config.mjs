@@ -33,9 +33,19 @@ function print(value) {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
 }
 
+// Ends the subcommand with this exit code. It is thrown to main and not passed
+// to process.exit, which can cut off output still queued to a pipe, and a pipe
+// holds 64 KB at most; the process ends once its output has been written.
+class Exit extends Error {
+  constructor(code) {
+    super(`exit ${code}`);
+    this.code = code;
+  }
+}
+
 function fail(message, code = 1) {
   print({ error: message });
-  process.exit(code);
+  throw new Exit(code);
 }
 
 function git(root, args) {
@@ -106,7 +116,7 @@ function requireBaseline(root) {
   const result = loadBaseline(root);
   if (result.errors) {
     print({ baseline_errors: result.errors });
-    process.exit(2);
+    throw new Exit(2);
   }
   return result;
 }
@@ -162,17 +172,17 @@ async function runApply(args) {
   const { baseline } = requireBaseline(root);
   if (JSON.stringify(baseline) !== JSON.stringify(plan.baseline)) {
     print({ status: 'stale', reason: 'the baseline file changed since the plan was built; run the audit again and confirm the new plan' });
-    process.exit(3);
+    throw new Exit(3);
   }
   const gh = createGh();
   const repository = resolveRepository(gh);
   if (JSON.stringify(repository) !== JSON.stringify(plan.repository)) {
     print({ status: 'stale', reason: 'the checkout resolves to a different repository than the plan was built for' });
-    process.exit(3);
+    throw new Exit(3);
   }
   const result = await applyPlan({ gh, plan, baseline });
   print(result);
-  if (result.status === 'stale') process.exit(3);
+  if (result.status === 'stale') throw new Exit(3);
 }
 
 function runGuidance(args) {
@@ -199,17 +209,17 @@ function runGuidance(args) {
   }
   if (!location.inside) {
     print({ file: location, refused: 'the path resolves outside the repository; never write through it' });
-    process.exit(4);
+    throw new Exit(4);
   }
   if (location.exists && !location.tracked) {
     print({ file: location, refused: 'a pre-existing untracked file at a target path is the user\'s unfinished work; report the fix as pending until they track or remove it' });
-    process.exit(4);
+    throw new Exit(4);
   }
   const before = location.exists ? fs.readFileSync(location.resolved, 'utf8') : '';
   const result = writeBlock(before, patterns);
   if (result.error) {
     print({ file: location, refused: result.error });
-    process.exit(4);
+    throw new Exit(4);
   }
   if (result.action !== 'unchanged') {
     fs.mkdirSync(path.dirname(location.resolved), { recursive: true });
@@ -229,9 +239,15 @@ async function main(argv) {
         return fail('usage: check-repo-config.mjs audit [--plan-out <file>] | apply <plan.json> | guidance render|inspect <file>|write <file>');
     }
   } catch (err) {
-    if (err instanceof GhError || err instanceof ResolveError || err instanceof LocateError) return fail(err.message);
+    if (err instanceof Exit) {
+      process.exitCode = err.code;
+      return undefined;
+    }
     // Every subcommand prints one JSON document, an unforeseen failure included.
-    return fail(`unexpected error: ${err.stack}`);
+    const known = err instanceof GhError || err instanceof ResolveError || err instanceof LocateError;
+    print({ error: known ? err.message : `unexpected error: ${err.stack}` });
+    process.exitCode = 1;
+    return undefined;
   }
 }
 
