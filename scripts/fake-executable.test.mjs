@@ -16,7 +16,9 @@ const module = pathToFileURL(join(here, 'fake-executable.mjs')).href
 // Link `tool` into a fake directory from a process whose working directory is
 // `cwd` and whose PATH starts with `path`. Returns whether the link led to a
 // file, or the error if there was none, and the directory the process made,
-// which it removes before it ends.
+// which it removes before it ends. The process prints strings only, because
+// console.log colors a boolean when FORCE_COLOR reaches it, as it does from a
+// terminal, and the parent reads the text.
 const link = (cwd, path, tool) => {
   const script = `
     import { existsSync } from 'node:fs'
@@ -27,7 +29,7 @@ const link = (cwd, path, tool) => {
     console.log(dir)
     try {
       linkTools(dir, [${JSON.stringify(tool)}])
-      console.log(existsSync(join(dir, ${JSON.stringify(tool)})))
+      console.log(String(existsSync(join(dir, ${JSON.stringify(tool)}))))
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
