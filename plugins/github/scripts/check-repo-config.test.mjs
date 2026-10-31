@@ -278,12 +278,21 @@ test('a failure nothing foresaw is still one JSON document', () => {
   assert.match(result.json.error, /^unexpected error: .*ENOENT/s);
 });
 
-test('a missing git is reported as not being in a repository', () => {
+test('a missing git is reported as missing, not as a directory that is not a repository', () => {
   const dir = repository();
   const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'check-repo-config-nogit-'));
   const result = spawnSync(process.execPath, [SCRIPT, 'audit'], { cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: empty } });
   assert.equal(result.status, 1);
-  assert.equal(JSON.parse(result.stdout).error, 'not inside a Git repository: ');
+  assert.equal(JSON.parse(result.stdout).error, 'git is not installed or not on PATH');
+});
+
+test('a git that cannot be started for another reason is an unexpected error, not a missing git', () => {
+  const dir = repository();
+  const broken = fs.mkdtempSync(path.join(os.tmpdir(), 'check-repo-config-badgit-'));
+  fs.writeFileSync(path.join(broken, 'git'), '#!/bin/sh\nexit 0\n', { mode: 0o644 });
+  const result = spawnSync(process.execPath, [SCRIPT, 'audit'], { cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: broken } });
+  assert.equal(result.status, 1);
+  assert.match(JSON.parse(result.stdout).error, /^unexpected error: .*EACCES/s);
 });
 
 // ---------------------------------------------------------------------------

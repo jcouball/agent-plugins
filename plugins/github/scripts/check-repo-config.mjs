@@ -48,9 +48,18 @@ function fail(message, code = 1) {
   throw new Exit(code);
 }
 
+class GitMissingError extends Error {}
+
+// git's exit status, and what it printed. A git that did not run at all has
+// printed nothing, so it is named here and not read as a repository that is not
+// there.
 function git(root, args) {
   const result = spawnSync('git', root ? ['-C', root, ...args] : args, { encoding: 'utf8' });
-  return { ok: result.status === 0, stdout: (result.stdout ?? '').trim(), stderr: (result.stderr ?? '').trim() };
+  if (result.error) {
+    if (result.error.code === 'ENOENT') throw new GitMissingError('git is not installed or not on PATH');
+    throw result.error;
+  }
+  return { ok: result.status === 0, stdout: result.stdout.trim(), stderr: result.stderr.trim() };
 }
 
 function repoRoot() {
@@ -244,7 +253,7 @@ async function main(argv) {
       return undefined;
     }
     // Every subcommand prints one JSON document, an unforeseen failure included.
-    const known = err instanceof GhError || err instanceof ResolveError || err instanceof LocateError;
+    const known = [GhError, ResolveError, LocateError, GitMissingError].some((type) => err instanceof type);
     print({ error: known ? err.message : `unexpected error: ${err.stack}` });
     process.exitCode = 1;
     return undefined;
