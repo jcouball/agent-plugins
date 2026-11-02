@@ -317,6 +317,72 @@ it uses only what Node ships and what is vendored beside it, as
 js-yaml vendored that way, and the coverage run in `npm test` excludes
 the vendor directory so the threshold measures this repository's code.
 
+## Writing a script
+
+A script is a short file that calls a function. This holds for the checks under
+`scripts/` and for the scripts a plugin ships under `plugins/<plugin>/scripts/`.
+The logic lives in `lib/<name>.mjs` as an exported function that is given
+everything it needs from outside and returns the exit code:
+
+```js
+// lib/sync-plugins.mjs
+export function syncPlugins({ only, root, home, env, visible, stdout, stderr, ... }) {
+  ...
+  return exitCode
+}
+
+// sync-plugins.mjs
+process.exitCode = syncPlugins({ only: process.argv[2], root, env: process.env, ... })
+```
+
+A check whose output is a list of findings may return them in place of the code.
+`checkLinks` returns `{ broken, checked }` and `checkManifests` returns
+`{ errors, plugins }`, and their scripts print what came back and set
+`process.exitCode`. It is the same split with the printing left to the script.
+
+What the function is given is what it would otherwise read from the process: the
+arguments, the working directory, the environment, the tools it runs (`gh`,
+`claude`, `fetch`, `spawn`), and where its output goes. The script supplies the
+real ones. A function that reads none of them from the process can be called
+from a test with fakes, and nothing in it needs a process to exist.
+
+Neither the function nor the script calls `process.exit` to end a run. It can cut
+off output still queued to a pipe, which holds 64 KB at most, and Linux hides the
+loss where macOS shows it. A stop in the middle of the function is an error thrown
+to its top level, where it becomes the return value. What belongs to the process
+stays in the script: a cleanup on exit or on a signal, which is the one place a
+script calls `process.exit`, and a pinned value the script owns.
+
+The tests follow the split. `<name>.test.mjs` calls the function in the test's
+own process with a function in place of each tool that reaches outside the
+repository (`gh`, `claude`, `fetch`, the program under lint), so it needs no fake
+executable on `PATH`. A tool the function uses only on the repository it works on,
+such as `git` in `sync-plugins` and `check-repo-config`, stays real and runs
+against a fixture repository. The `sync-plugins` fixtures set the developer's git
+configuration aside; the git variables in the environment are not yet set aside
+([#138](https://github.com/jcouball/agent-plugins/issues/138)).
+`<name>.cli.test.mjs` starts the script, and holds only
+what a running program has: the exit status through a shell, a document larger
+than a pipe holds, a tool missing from `PATH`, a signal. Keep that file short.
+The tests of `check-repo-config` predate the name: its function's tests are in
+`run.test.mjs` and the ones that start the script in `check-repo-config.test.mjs`.
+
+`npm test` counts the function through both kinds of test, so the coverage gate
+does not tell you which one reaches a statement. To check that the function's own
+tests do, run them alone under c8:
+
+```bash
+npx c8 --check-coverage=false --include=scripts/lib/sync-plugins.mjs \
+  node --test scripts/sync-plugins.test.mjs
+```
+
+Two changes to a statement show what its tests do. A `throw` before it fails a
+test only if a test runs the statement, whatever the coverage report says. A
+changed return value or message fails a test only if a test checks what the
+statement produces.
+
+`scripts/sync-plugins.mjs` and `scripts/lib/sync-plugins.mjs` are the model.
+
 ## Adding a plugin
 
 1. Create `plugins/<name>/.claude-plugin/plugin.json`.
