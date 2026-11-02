@@ -1,10 +1,11 @@
-// Tests for check-actions.mjs, which exports nothing: it runs when node loads
-// it, so a test spawns it. A fake actionlint on a PATH that holds nothing else
-// stands in for the real one, so the run downloads nothing and the notices
-// about shellcheck and pyflakes depend on what the test puts there, not on what
-// the host has installed. The download itself is covered in
-// download-actionlint.test.mjs; here a preload (fake-environment.mjs) makes
-// fetch fail, so a version mismatch reaches the download and stops there.
+// Tests for check-actions.mjs as a program. What it does is tested in
+// check-actions.test.mjs, which calls checkActions() in the test's own process.
+// These start the script, for what only a running program has: the actionlint
+// it finds on PATH and really runs, the platform and fetch it hands to the
+// download, and the scratch directory it removes when a signal ends it. A fake
+// actionlint on a PATH that holds nothing else stands in for the real one, so
+// the run downloads nothing. A preload (fake-environment.mjs) makes fetch fail
+// or hang, so a version mismatch reaches the download and stops there.
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
@@ -50,12 +51,6 @@ test('check-actions exits with the status actionlint ends with', () => {
   assert.doesNotMatch(result.stdout, /workflows ok/)
 })
 
-test('check-actions reports an actionlint that a signal ended', () => {
-  const result = check({ actionlint: versioned('kill -TERM $$'), shellcheck: 'exit 0' })
-  assert.equal(result.status, 1)
-  assert.match(result.stderr, /^actionlint check failed: actionlint was killed by SIGTERM\n/)
-})
-
 test('check-actions reports an actionlint that is gone by the time it runs', () => {
   const result = check({ actionlint: versioned('exit 0').replace('exit 0; fi', 'rm "$0"; exit 0; fi') }, {}, ['rm'])
   assert.equal(result.status, 1)
@@ -85,55 +80,6 @@ test('check-actions downloads when the actionlint on PATH is another version', (
     result.stderr,
     /^actionlint check failed: GET https:\/\/github\.com\/rhysd\/actionlint\/releases\/download\/v1\.7\.12\/actionlint_1\.7\.12_\w+\.tar\.gz returned 404\n$/,
   )
-})
-
-test('check-actions downloads when actionlint is not on PATH at all', () => {
-  const result = check({}, { FAKE_FETCH_STATUS: '503' })
-  assert.equal(result.status, 1)
-  assert.match(result.stderr, /returned 503\n$/)
-})
-
-test('check-actions says no build is pinned for a platform it has none for', () => {
-  const result = check({}, { FAKE_PLATFORM: 'sunos' })
-  assert.equal(result.status, 1)
-  assert.match(result.stderr, /^actionlint check failed: no pinned actionlint build for sunos_\w+\. Install actionlint 1\.7\.12 yourself/)
-})
-
-test('check-actions notes that shellcheck is missing, and not when it is there', () => {
-  const missing = check({ actionlint: versioned('exit 0') })
-  assert.match(missing.stderr, /^note: shellcheck is not on PATH, so the shell in `run:` steps went unchecked\./)
-  const present = check({ actionlint: versioned('exit 0'), shellcheck: 'exit 0' })
-  assert.equal(present.stderr, '')
-})
-
-// A fake actionlint that runs the pyflakes it is given on a Python script, as
-// actionlint does for a `shell: python` step.
-const runsPython = versioned('for a in "$@"; do case "$a" in -pyflakes=*) echo "print(1)" | "${a#-pyflakes=}" ;; esac; done')
-
-// The stand-in for pyflakes is a shell script that runs cat and touch, which a
-// PATH holding only the fakes does not have.
-const coreutils = ['cat', 'touch']
-
-test('check-actions notes that pyflakes is missing only when a workflow has a Python step', () => {
-  const python = check({ actionlint: runsPython, shellcheck: 'exit 0' }, {}, coreutils)
-  assert.equal(python.status, 0)
-  assert.match(python.stderr, /^note: pyflakes is not on PATH, so the Python steps in these workflows went\n/)
-  const none = check({ actionlint: versioned('exit 0'), shellcheck: 'exit 0' })
-  assert.equal(none.stderr, '')
-})
-
-test('check-actions leaves pyflakes to actionlint when it is installed', () => {
-  const result = check({ actionlint: versioned('echo "$*"'), pyflakes: 'exit 0', shellcheck: 'exit 0' })
-  assert.equal(result.status, 0)
-  assert.doesNotMatch(result.stdout, /-pyflakes/)
-  assert.equal(result.stderr, '')
-})
-
-test('check-actions hands actionlint a stand-in for the missing pyflakes, except on Windows', () => {
-  const unix = check({ actionlint: versioned('echo "$*"'), shellcheck: 'exit 0' })
-  assert.match(unix.stdout, /-pyflakes=\S+pyflakes-stub/)
-  const windows = check({ actionlint: versioned('echo "$*"'), shellcheck: 'exit 0' }, { FAKE_PLATFORM: 'win32' })
-  assert.doesNotMatch(windows.stdout, /-pyflakes/)
 })
 
 // The scratch directories a run leaves under node_modules, where it makes them.
