@@ -101,8 +101,9 @@ const recordFile = (home) => join(home, '.claude/plugins/installed_plugins.json'
 // origin/main, which is known only once the fixture exists. `env` steers the
 // fake claude. `relative` names the root by its path from the directory above
 // it, and runs the script from there.
-const sync = ({ args = [], installed, after, env = {}, relative = false, ...options } = {}) => {
+const sync = ({ args = [], installed, after, env = {}, relative = false, breakOrigin = false, ...options } = {}) => {
   const repository = fixture(options)
+  if (breakOrigin) rmSync(join(repository.base, 'origin.git'), { recursive: true, force: true })
   const tools = fakeTools({ claude })
   try {
     const afterPath = join(repository.base, 'after.json')
@@ -192,6 +193,13 @@ test('sync-plugins stops when the manifests are invalid', () => {
   const result = sync({ files: { 'plugins/alpha/.claude-plugin/plugin.json': '{' } })
   assert.equal(result.status, 1)
   assert.match(result.stderr, /error: manifest check failed\. Fix the manifests before syncing\./)
+  assert.deepEqual(result.calls, [])
+})
+
+test('sync-plugins lets a failure it does not expect end the run, with the error on stderr', () => {
+  const result = sync({ breakOrigin: true })
+  assert.equal(result.status, 1)
+  assert.match(result.stderr, /Command failed: git fetch origin --quiet/)
   assert.deepEqual(result.calls, [])
 })
 
