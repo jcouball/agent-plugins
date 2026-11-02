@@ -14,6 +14,7 @@ const { broken, checked } = checkLinks(root)
 if (broken.length > 0) {
   console.error('link check failed:')
   for (const link of broken) console.error(`  ${link}`)
-  process.exit(1)
+  process.exitCode = 1
+} else {
+  console.log(`links ok: ${checked} cross-file link(s) checked`)
 }
-console.log(`links ok: ${checked} cross-file link(s) checked`)

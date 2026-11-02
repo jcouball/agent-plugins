@@ -15,6 +15,7 @@ const { errors, plugins } = checkManifests(root)
 if (errors.length > 0) {
   console.error('manifest check failed:')
   for (const error of errors) console.error(`  ${error}`)
-  process.exit(1)
+  process.exitCode = 1
+} else {
+  console.log(`manifests ok: ${plugins} plugin(s) checked`)
 }
-console.log(`manifests ok: ${plugins} plugin(s) checked`)
