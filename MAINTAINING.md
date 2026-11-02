@@ -215,11 +215,15 @@ npm run ci
 Six checks, each runnable on its own:
 
 - `npm test` runs the tests for the check scripts themselves and for the
-  scripts the plugins ship, with Node's built-in test runner, and prints
-  the coverage table after them. The run fails when branch coverage across
-  every file falls below the `--test-coverage-branches` value in
-  `package.json`. That value sits just under where the code stands and
-  only ever moves up; raising it to 100 is issue #94. The anchors
+  scripts the plugins ship, with Node's built-in test runner under c8, and
+  prints the coverage table after them. The run fails when lines, branches, or
+  functions fall below 100% across every file under `scripts/` and
+  `plugins/*/scripts/`, counting a file no test loads as uncovered. c8 reads
+  the raw V8 coverage from every process the tests start and merges it
+  itself, which Node's own merged report did not do reliably: it counted
+  blocks no test ran and dropped others at random. The settings live in
+  `.c8rc.json`. To check that a block has a test, put a `throw` in it and run
+  the tests. The anchors
   the link check's tests expect are kept in `scripts/check-links.cases.mjs`;
   when the check disagrees with GitHub about a heading or an HTML anchor,
   add it there as a case.
@@ -259,9 +263,7 @@ CI runs the same checks in two jobs, `Lint and Validate` and
 `Verify Conventional Commits`. A third job, `Lint and Validate (macOS)`, runs the
 steps of the first on macOS, where a pipe write is asynchronous and a script that
 exits right after printing can lose output still queued, which no test can catch on
-Linux. It runs `npm run test:run`, which is `npm test` without the coverage gate,
-because the gate fails at random there. The branch ruleset does not require that
-job yet.
+Linux. The branch ruleset does not require that job yet.
 
 The link check copies three things from GitHub's rendering: the anchor each
 case expects, the HTML elements GitHub's sanitizer keeps, and the link schemes

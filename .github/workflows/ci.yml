@@ -23,9 +23,7 @@ jobs:
   # catch on Linux. lint:actions also checks the pinned macOS actionlint
   # download against its checksum for real. It is a separate job and not a
   # matrix leg of the lint job, so the name of the check the branch ruleset
-  # requires does not change. It runs the tests without the coverage gate, which
-  # Linux holds: the gate fails at random on macOS with every test passing, and
-  # #125 replaces it. That is the one difference, and it ends there.
+  # requires does not change.
   lint-macos:
     name: Lint and Validate (macOS)
 
@@ -45,7 +43,7 @@ jobs:
         run: npm ci
 
       - name: Run the script tests
-        run: npm run test:run
+        run: npm test
 
       - name: Validate manifests
         run: npm run lint:manifests
