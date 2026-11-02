@@ -1,0 +1,15 @@
+{
+  "all": true,
+  "include": ["scripts/**", "plugins/*/scripts/**"],
+  "exclude": [
+    "**/*.test.mjs",
+    "**/*.cases.mjs",
+    "**/fake-*.mjs",
+    "**/vendor/**"
+  ],
+  "reporter": ["text"],
+  "check-coverage": true,
+  "lines": 100,
+  "functions": 100,
+  "branches": 100
+}
