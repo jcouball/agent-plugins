@@ -24,10 +24,11 @@
 // publishes those but no checksum for them is pinned below.
 
 import { spawnSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { arch, platform } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { checkActions } from './lib/check-actions.mjs'
 import { downloadActionlint } from './lib/download-actionlint.mjs'
 
 const version = '1.7.12'
@@ -44,17 +45,12 @@ const checksums = {
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
-const fail = (message) => {
-  console.error(`actionlint check failed: ${message}`)
-  process.exit(1)
-}
-
 // One directory for everything this run writes: the binary, if it downloads
 // one, and the pyflakes stub below. mkdtemp creates it atomically under a name
 // no concurrent run holds, and the exit hook removes it whichever way this
-// ends, `fail()` included. It sits under node_modules rather than the system
-// temp directory because the binary has to be executable where it lands, and
-// /tmp is mounted noexec on some hosts.
+// ends. It sits under node_modules rather than the system temp directory
+// because the binary has to be executable where it lands, and /tmp is mounted
+// noexec on some hosts.
 const parent = join(root, 'node_modules', '.cache', 'actionlint')
 mkdirSync(parent, { recursive: true })
 const scratch = mkdtempSync(join(parent, 'run.'))
@@ -72,100 +68,16 @@ for (const [name, number] of Object.entries({ SIGHUP: 1, SIGINT: 2, SIGTERM: 15 
   })
 }
 
-const versionOf = (binary) => {
-  const result = spawnSync(binary, ['--version'], { encoding: 'utf8' })
-  if (result.status !== 0) return null
-  return result.stdout.split('\n')[0].trim()
-}
-
-const download = async () => {
-  try {
-    return await downloadActionlint({
-      version,
-      checksums,
-      platform: platform(),
-      arch: arch(),
-      fetch,
-      tar: 'tar',
-      directory: scratch,
-      log: console.log,
-    })
-  } catch (error) {
-    return fail(error.message)
-  }
-}
-
-// Only an exact match. A different version would lint by different rules
-// locally than CI enforces, which is the one thing pinning is for.
-const locate = async () => (versionOf('actionlint') === version ? 'actionlint' : download())
-
-const main = async () => {
-  const actionlint = await locate()
-
-  // actionlint lints the shell inside `run:` steps with shellcheck, and Python
-  // steps with pyflakes, but only when those commands are on PATH. Left silent,
-  // a machine without shellcheck passes a workflow that CI, which has it,
-  // rejects. Say so instead of letting the two disagree quietly.
-  const onPath = (command) => spawnSync(command, ['--version'], { encoding: 'utf8' }).status === 0
-
-  // pyflakes only ever runs on Python steps, so nagging about it in a repository
-  // that has none would be noise nobody reads. Which steps those are is a
-  // question about parsed YAML rather than about the text — a flow mapping can
-  // write `shell: python` mid-line, or split it across two — so rather than
-  // guess, hand actionlint a stub in place of the pyflakes it cannot find and
-  // let it answer. Nothing is lost by substituting it: with pyflakes missing
-  // those scripts go unchecked either way.
-  const args = []
-  let marker = null
-
-  // The stub is a `/bin/sh` script, so this probe is macOS and Linux only. A
-  // Windows host that installed actionlint by hand and lacks pyflakes therefore
-  // gets no notice — the shellcheck one above still reaches it. Closing that
-  // would mean an executable stub Windows can run and no way to test it from
-  // here, which is a poor trade for a platform nothing in this repository uses.
-  if (!onPath('pyflakes') && platform() !== 'win32') {
-    marker = join(scratch, 'pyflakes-wanted')
-
-    const stub = join(scratch, 'pyflakes-stub')
-    writeFileSync(
-      stub,
-      // actionlint feeds the script in on stdin, so the stub has to drain it.
-      `#!/bin/sh\ncat >/dev/null\ntouch '${marker.replaceAll("'", `'\\''`)}'\nexit 0\n`
-    )
-    chmodSync(stub, 0o755)
-    args.push(`-pyflakes=${stub}`)
-  }
-
-  const result = spawnSync(actionlint, args, { cwd: root, stdio: 'inherit' })
-
-  const pythonWentUnchecked = marker !== null && existsSync(marker)
-
-  // A binary that vanished between the version check and here never ran, which
-  // leaves status null and, without this, exits 0 below.
-  if (result.error) fail(result.error.message)
-
-  if (!onPath('shellcheck')) {
-    console.warn(
-      'note: shellcheck is not on PATH, so the shell in `run:` steps went unchecked.\n' +
-        '      CI has it and will lint more than this run did. Packages for every\n' +
-        '      platform: https://github.com/koalaman/shellcheck#installing'
-    )
-  }
-
-  if (pythonWentUnchecked) {
-    console.warn(
-      'note: pyflakes is not on PATH, so the Python steps in these workflows went\n' +
-        '      unchecked. Install it with: pip install pyflakes'
-    )
-  }
-
-  // A signal kill leaves status null with no error set, and process.exit(null)
-  // exits 0. Without this the gate goes green on an actionlint that never ran to
-  // completion.
-  if (result.signal) fail(`actionlint was killed by ${result.signal}`)
-  if (result.status !== 0) process.exit(result.status)
-
-  console.log(`workflows ok: actionlint ${version} found no problems`)
-}
-
-await main()
+process.exitCode = await checkActions({
+  version,
+  checksums,
+  root,
+  platform: platform(),
+  arch: arch(),
+  fetch,
+  spawn: spawnSync,
+  download: downloadActionlint,
+  scratch,
+  stdout: process.stdout,
+  stderr: process.stderr,
+})
